@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>MAX Automation</title>
 <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/1/12/Логотип_MAX.svg" type="image/svg+xml"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,7 +57,6 @@ tailwind.config = {
 <script>
 // Fallback: если Chart.js не загрузился с CDN — рисуем простые графики на canvas
 window.Chart = window.Chart || (function(){
-  function CtxAdapter(ctx){ this.ctx = ctx; this.w = ctx.canvas.width; this.h = ctx.canvas.height; }
   function SimpleChart(ctx, cfg){
     this.cfg = cfg; this.type = cfg.type;
     this.draw = function(){
@@ -119,15 +118,11 @@ window.Chart = window.Chart || (function(){
     window.addEventListener('resize', function(){ self.draw(); });
   }
   return { defaults:{font:{family:'Inter',size:11},color:'#A8A29E'},
-    __last: null,
-    prototype: {},
-    register: function(){},
-    get: function(){ return this.__last; },
-    __set: function(c){ this.__last = c; }
+    __last: null, prototype: {}, register: function(){},
+    get: function(){ return this.__last; }, __set: function(c){ this.__last = c; }
   };
 })();
 </script>
-
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 <style>
   body {
@@ -141,6 +136,10 @@ window.Chart = window.Chart || (function(){
   ::selection { background: #F6D9D0; color: #1A1A1A; }
   [x-cloak] { display: none !important; }
   .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  
+  /* Скрыть скроллбар для навигации на мобильных */
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -193,11 +192,11 @@ window.Chart = window.Chart || (function(){
 
   .dot { display: inline-block; height: 6px; width: 6px; border-radius: 50%; flex-shrink: 0; }
 
-  .seg { display: inline-flex; background: #F3F0EB; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg { display: inline-flex; background: #F3F0EB; border-radius: 8px; padding: 3px; gap: 2px; overflow-x: auto; }
   .seg > button {
     height: 28px; padding: 0 12px; border-radius: 6px;
     font-size: 12px; font-weight: 500; color: #78716C;
-    transition: all .15s;
+    transition: all .15s; white-space: nowrap;
   }
   .seg > button:hover { color: #1A1A1A; }
   .seg > button.on { background: #FFFFFF; color: #1A1A1A; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
@@ -216,13 +215,21 @@ window.Chart = window.Chart || (function(){
   .toggle.off { background: #E8E4DB; }
 
   .card { background: #FFFFFF; border: 1px solid #EBE8E3; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
-  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #F3F0EB; gap: 16px; flex-wrap: wrap; }
-  .card-title { font-size: 16px; font-weight: 500; color: #1A1A1A; }
-  .card-body { padding: 24px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #F3F0EB; gap: 12px; flex-wrap: wrap; }
+  @media (min-width: 640px) {
+    .card-head { padding: 20px 24px; gap: 16px; }
+  }
+  .card-title { font-size: 15px; font-weight: 500; color: #1A1A1A; }
+  @media (min-width: 640px) { .card-title { font-size: 16px; } }
+  .card-body { padding: 16px 20px; }
+  @media (min-width: 640px) { .card-body { padding: 24px; } }
 
-  .stat-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #78716C; }
-  .stat-value { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; color: #1A1A1A; }
-  .stat-sub { font-size: 12px; color: #A8A29E; margin-top: 4px; }
+  .stat-label { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #78716C; }
+  @media (min-width: 640px) { .stat-label { font-size: 11px; } }
+  .stat-value { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; color: #1A1A1A; }
+  @media (min-width: 640px) { .stat-value { font-size: 24px; } }
+  .stat-sub { font-size: 11px; color: #A8A29E; margin-top: 4px; }
+  @media (min-width: 640px) { .stat-sub { font-size: 12px; } }
 
   .emoji-tile {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -240,8 +247,11 @@ window.Chart = window.Chart || (function(){
 
   .post-row { transition: background .15s; }
   .post-row:hover { background: #FAF8F5; }
-  .post-row:hover .row-actions { opacity: 1; }
-  .row-actions { opacity: 0; transition: opacity .15s; }
+  /* На десктопе кнопки показываем при наведении, на мобильных всегда */
+  @media (min-width: 768px) {
+    .row-actions { opacity: 0; transition: opacity .15s; }
+    .post-row:hover .row-actions { opacity: 1; }
+  }
 
   .menu-item {
     display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
@@ -252,7 +262,8 @@ window.Chart = window.Chart || (function(){
   .menu-item.danger { color: #C25A53; }
   .menu-item.danger:hover { background: #FCF1F1; }
 
-  .drawer-section { padding: 24px; border-bottom: 1px solid #F3F0EB; }
+  .drawer-section { padding: 20px; border-bottom: 1px solid #F3F0EB; }
+  @media (min-width: 640px) { .drawer-section { padding: 24px; } }
   .drawer-section:last-of-type { border-bottom: none; }
 
   input[type=number] { -moz-appearance: textfield; }
@@ -269,77 +280,77 @@ window.Chart = window.Chart || (function(){
 </head>
 
 <body x-data="app()" x-init="init()"
-      @keydown.escape.window="drawerOpen=false; confirm.open=false; addChannelOpen=false; postMenuOpen=null;">
+      @keydown.escape.window="drawerOpen=false; confirm.open=false; addChannelOpen=false; postMenuOpen=null; templateDrawerOpen=false;">
 
 <!-- ═══ HEADER ═══ -->
 <header class="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-md">
-  <div class="mx-auto flex h-16 max-w-[1200px] items-center gap-8 px-6">
+  <div class="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-4 sm:gap-8 sm:px-6">
 
     <!-- Логотип и Название -->
     <a @click.prevent="tab='tasks'" href="#" class="flex shrink-0 items-center gap-2.5 group">
       <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Логотип_MAX.svg"
            alt="MAX" class="h-6 w-6 rounded-[6px] transition-transform group-hover:scale-105" loading="lazy" referrerpolicy="no-referrer"/>
-      <span class="font-serif text-[20px] font-medium tracking-tight text-ink whitespace-nowrap">MAX Automation</span>
+      <span class="hidden sm:inline font-serif text-[20px] font-medium tracking-tight text-ink whitespace-nowrap">MAX Automation</span>
     </a>
 
-    <!-- Навигация -->
-    <nav class="flex items-center gap-1">
-      <button @click="tab='tasks'" :class="tab==='tasks' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+    <!-- Навигация (скроллится на мобильных) -->
+    <nav class="flex items-center gap-1 overflow-x-auto hide-scrollbar flex-1 sm:flex-none">
+      <button @click="tab='tasks'" :class="tab==='tasks' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-3 sm:px-4 text-[13px] font-medium transition-colors whitespace-nowrap">
         Задания
-        <span x-show="tab==='tasks'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+        <span x-show="tab==='tasks'" class="absolute inset-x-3 sm:inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
       </button>
-      <button @click="tab='analytics'" :class="tab==='analytics' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+      <button @click="tab='analytics'" :class="tab==='analytics' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-3 sm:px-4 text-[13px] font-medium transition-colors whitespace-nowrap">
         Аналитика
-        <span x-show="tab==='analytics'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+        <span x-show="tab==='analytics'" class="absolute inset-x-3 sm:inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
       </button>
-      <button @click="tab='channels'" :class="tab==='channels' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+      <button @click="tab='channels'" :class="tab==='channels' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-3 sm:px-4 text-[13px] font-medium transition-colors whitespace-nowrap">
         Каналы
-        <span x-show="tab==='channels'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+        <span x-show="tab==='channels'" class="absolute inset-x-3 sm:inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
       </button>
-      <button @click="tab='templates'" :class="tab==='templates' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+      <button @click="tab='templates'" :class="tab==='templates' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-3 sm:px-4 text-[13px] font-medium transition-colors whitespace-nowrap">
         Шаблоны
-        <span x-show="tab==='templates'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+        <span x-show="tab==='templates'" class="absolute inset-x-3 sm:inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
       </button>
-      <button @click="tab='settings'" :class="tab==='settings' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+      <button @click="tab='settings'" :class="tab==='settings' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-3 sm:px-4 text-[13px] font-medium transition-colors whitespace-nowrap">
         Настройки
-        <span x-show="tab==='settings'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+        <span x-show="tab==='settings'" class="absolute inset-x-3 sm:inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
       </button>
     </nav>
 
     <!-- Действия -->
-    <div class="ml-auto flex items-center gap-3">
-      <button class="icon-btn h-8 w-8" @click="refresh()" :title="'Обновлено ' + syncedAt">
+    <div class="flex shrink-0 items-center gap-2 sm:gap-3 ml-auto">
+      <button class="hidden sm:inline-flex icon-btn h-8 w-8" @click="refresh()" :title="'Обновлено ' + syncedAt">
         <svg class="h-4 w-4" :class="refreshing && 'animate-spin'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
       </button>
       
-      <!-- Кнопка Баланса (Исправлена верстка) -->
-      <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-surface border border-line px-3 text-[12px] transition-colors hover:border-line-2 hover:bg-subtle whitespace-nowrap" title="Пополнить на SMMPrime">
-        <span class="text-ink-3">Баланс</span>
+      <!-- Кнопка Баланса -->
+      <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-surface border border-line px-2 sm:px-3 text-[12px] transition-colors hover:border-line-2 hover:bg-subtle whitespace-nowrap" title="Пополнить на SMMPrime">
+        <span class="hidden sm:inline text-ink-3">Баланс</span>
         <span class="font-medium text-ink tabular-nums">₽ <span x-text="fmtMoney(balance)"></span></span>
       </a>
       
-      <button class="btn btn-primary h-8 px-4 text-[12px] rounded-lg shadow-sm" @click="openDrawer()">
+      <button class="btn btn-primary h-8 px-3 sm:px-4 text-[12px] rounded-lg shadow-sm" @click="openDrawer()">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Новое
+        <span class="hidden sm:inline">Новое</span>
       </button>
     </div>
   </div>
 </header>
 
-<main class="mx-auto max-w-[1200px] px-6 py-8">
+<main class="mx-auto max-w-[1200px] px-4 py-6 sm:px-6 sm:py-8">
 
   <!-- ═══ TAB: TASKS ═══ -->
   <div x-show="tab==='tasks'" class="space-y-6">
 
     <!-- Заголовок -->
     <div class="flex flex-col gap-1.5">
-      <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Задания</h1>
-      <p class="text-[14px] text-ink-3">Управление активностью публикаций в реальном времени.</p>
+      <h1 class="font-serif text-[28px] sm:text-[32px] font-medium leading-tight text-ink">Задания</h1>
+      <p class="text-[13px] sm:text-[14px] text-ink-3">Управление активностью публикаций в реальном времени.</p>
     </div>
 
     <!-- Toolbar -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3 text-[13px]">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-wrap items-center gap-3 text-[12px] sm:text-[13px]">
         <span class="flex items-center gap-2 text-ink-2"><span class="dot bg-ok"></span> <span x-text="runningCount"></span> в работе</span>
         <span class="text-line-2">|</span>
         <span class="flex items-center gap-2 text-ink-2"><span class="dot bg-warn"></span> <span x-text="pausedCount"></span> на паузе</span>
@@ -348,44 +359,46 @@ window.Chart = window.Chart || (function(){
           Автоподхват <span :class="settings.autoPickup ? 'text-ok' : 'text-ink-4'" class="font-medium" x-text="settings.autoPickup ? 'вкл' : 'выкл'"></span>
         </button>
       </div>
-      <div class="seg">
-        <button :class="filter==='all' && 'on'" @click="filter='all'">Все <span class="text-ink-4 ml-1" x-text="posts.length"></span></button>
-        <button :class="filter==='running' && 'on'" @click="filter='running'">В работе</button>
-        <button :class="filter==='paused' && 'on'" @click="filter='paused'">Пауза</button>
-        <button :class="filter==='completed' && 'on'" @click="filter='completed'">Готово</button>
+      <div class="seg w-full sm:w-auto">
+        <button class="flex-1 sm:flex-none" :class="filter==='all' && 'on'" @click="filter='all'">Все <span class="text-ink-4 ml-1" x-text="posts.length"></span></button>
+        <button class="flex-1 sm:flex-none" :class="filter==='running' && 'on'" @click="filter='running'">В работе</button>
+        <button class="flex-1 sm:flex-none" :class="filter==='paused' && 'on'" @click="filter='paused'">Пауза</button>
+        <button class="flex-1 sm:flex-none" :class="filter==='completed' && 'on'" @click="filter='completed'">Готово</button>
       </div>
     </div>
 
     <!-- Поиск и фильтры -->
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="relative">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div class="relative flex-1">
         <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" x-model="query" class="field h-9 w-72 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск по URL или каналу" autocomplete="off"/>
+        <input type="text" x-model="query" class="field h-9 w-full pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск по URL или каналу" autocomplete="off"/>
       </div>
 
-      <select x-model="channelFilter" class="field field-select h-9 w-48 text-[12px] rounded-lg">
-        <option value="">Все каналы</option>
-        <template x-for="ch in channels" :key="ch.id">
-          <option :value="ch.handle" x-text="'max.ru/' + ch.handle"></option>
-        </template>
-      </select>
+      <div class="flex gap-2 w-full sm:w-auto">
+        <select x-model="channelFilter" class="field field-select h-9 flex-1 sm:w-48 text-[12px] rounded-lg">
+          <option value="">Все каналы</option>
+          <template x-for="ch in channels" :key="ch.id">
+            <option :value="ch.handle" x-text="'max.ru/' + ch.handle"></option>
+          </template>
+        </select>
 
-      <select x-model="sortValue" class="field field-select h-9 w-48 text-[12px] rounded-lg">
-        <option value="date-desc">Новые сверху</option>
-        <option value="date-asc">Старые сверху</option>
-        <option value="progress-desc">Прогресс ↓</option>
-        <option value="progress-asc">Прогресс ↑</option>
-      </select>
+        <select x-model="sortValue" class="field field-select h-9 flex-1 sm:w-48 text-[12px] rounded-lg">
+          <option value="date-desc">Новые сверху</option>
+          <option value="date-asc">Старые сверху</option>
+          <option value="progress-desc">Прогресс ↓</option>
+          <option value="progress-asc">Прогресс ↑</option>
+        </select>
+      </div>
 
-      <button class="btn btn-secondary h-9 px-3 text-[12px] rounded-lg" @click="exportTasksCSV()">
+      <button class="btn btn-secondary h-9 px-4 text-[12px] rounded-lg w-full sm:w-auto" @click="exportTasksCSV()">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Экспорт
       </button>
     </div>
 
     <!-- Метрики -->
-    <section class="card">
-      <div class="grid grid-cols-2 divide-x divide-line md:grid-cols-4">
+    <section class="card overflow-hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-line">
         <div class="p-5">
           <div class="flex items-center gap-2">
             <span class="dot bg-views"></span>
@@ -396,7 +409,7 @@ window.Chart = window.Chart || (function(){
               <p class="stat-value tabular-nums" x-text="intFmt(todayViews)"></p>
               <p class="stat-sub"><span class="tabular-nums text-reactions-fg" x-text="intFmt(todayReactions)"></span> реакций</p>
             </div>
-            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+            <svg class="hidden sm:block mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
               <path d="M0 20 L8 16 L16 18 L24 12 L32 14 L40 8 L48 10 L56 4 L64 6" stroke="#7F9AB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
@@ -411,7 +424,7 @@ window.Chart = window.Chart || (function(){
               <p class="stat-value tabular-nums" x-text="runningCount"></p>
               <p class="stat-sub">из <span class="tabular-nums" x-text="posts.length"></span> всего</p>
             </div>
-            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+            <svg class="hidden sm:block mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
               <path d="M0 12 L8 12 L16 14 L24 10 L32 12 L40 8 L48 10 L56 8 L64 6" stroke="#5F8E76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
@@ -426,7 +439,7 @@ window.Chart = window.Chart || (function(){
               <p class="stat-value tabular-nums"><span x-text="intFmt(peakRate)"></span><span class="text-[14px] text-ink-4 font-normal ml-1">/ч</span></p>
               <p class="stat-sub">в <span class="tabular-nums" x-text="peakHour + ':00'"></span></p>
             </div>
-            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+            <svg class="hidden sm:block mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
               <path d="M0 22 L8 18 L16 12 L24 8 L32 14 L40 16 L48 10 L56 12 L64 4" stroke="#78716C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
@@ -441,7 +454,7 @@ window.Chart = window.Chart || (function(){
               <p class="stat-value tabular-nums">₽ <span x-text="fmtMoney(todayCost)"></span></p>
               <p class="stat-sub">≈ <span class="tabular-nums" x-text="intFmt(todayCost / 0.05)"></span> просм</p>
             </div>
-            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+            <svg class="hidden sm:block mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
               <path d="M0 8 L8 10 L16 12 L24 10 L32 16 L40 14 L48 18 L56 16 L64 20" stroke="#C99B52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
@@ -449,25 +462,24 @@ window.Chart = window.Chart || (function(){
       </div>
     </section>
 
-    <!-- График 1 (Исправлена инициализация) -->
+    <!-- График 1 -->
     <section class="card">
       <div class="card-head">
         <h2 class="card-title">Доставка · 24 часа</h2>
-        <div class="flex items-center gap-4 text-[12px]">
-          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-views"></span>Просмотры</span>
-          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-reactions"></span>Реакции</span>
+        <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-[12px]">
+          <span class="flex items-center gap-1.5 text-ink-3"><span class="h-[3px] w-3 sm:w-4 rounded-full bg-views"></span>Просмотры</span>
+          <span class="flex items-center gap-1.5 text-ink-3"><span class="h-[3px] w-3 sm:w-4 rounded-full bg-reactions"></span>Реакции</span>
         </div>
       </div>
-      <div class="p-6 pt-8">
-        <!-- Контейнер с жесткой высотой -->
-        <div class="chart-wrapper h-[180px]">
+      <div class="p-4 sm:p-6 pt-6 sm:pt-8">
+        <div class="chart-wrapper h-[160px] sm:h-[180px]">
           <canvas x-ref="hourlyCanvas"></canvas>
         </div>
       </div>
     </section>
 
     <!-- Пустое состояние -->
-    <div x-show="sortedPosts.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-24 text-center">
+    <div x-show="sortedPosts.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-20 text-center px-4">
       <div class="flex h-16 w-16 items-center justify-center rounded-full bg-subtle">
         <svg class="h-7 w-7 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
       </div>
@@ -483,16 +495,16 @@ window.Chart = window.Chart || (function(){
       <div class="divide-y divide-line">
         <template x-for="post in sortedPosts" :key="post.id">
           <div class="post-row">
-            <div class="flex items-start gap-4 px-6 py-5">
+            <div class="flex items-start gap-3 px-4 py-4 sm:px-6 sm:py-5">
               <input type="checkbox" class="row-check mt-1" :checked="selected.includes(post.id)" @change="toggleSelect(post.id)"/>
 
               <div class="min-w-0 flex-1">
                 <!-- Row 1 -->
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 sm:gap-3">
                   <span class="dot shrink-0" :class="statusMeta(post.status).dot"></span>
-                  <a class="mono flex-1 truncate text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://' + post.url" target="_blank" rel="noopener" x-text="post.url"></a>
-                  <span class="text-[12px] tabular-nums text-ink-3 ml-2" x-text="pct(post) + '%'"></span>
-                  <div class="row-actions relative">
+                  <a class="mono flex-1 truncate text-[13px] sm:text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://' + post.url" target="_blank" rel="noopener" x-text="post.url"></a>
+                  <span class="text-[11px] sm:text-[12px] tabular-nums text-ink-3 ml-1 sm:ml-2" x-text="pct(post) + '%'"></span>
+                  <div class="row-actions relative shrink-0">
                     <button class="icon-btn h-7 w-7" @click.stop="togglePostMenu(post.id)">
                       <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>
                     </button>
@@ -511,7 +523,7 @@ window.Chart = window.Chart || (function(){
                 </div>
 
                 <!-- Row 2 -->
-                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-[20px] text-[12px] text-ink-4">
+                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[18px] text-[11px] sm:text-[12px] text-ink-4">
                   <span class="text-ink-3 font-medium" x-text="post.channel"></span>
                   <span class="text-line-2">·</span>
                   <span class="flex items-center gap-1.5">
@@ -521,20 +533,19 @@ window.Chart = window.Chart || (function(){
                   <span x-show="post.total.reactions > 0" class="flex items-center gap-1.5">
                     <span class="dot bg-reactions"></span>
                     <span class="tabular-nums"><span class="text-reactions-fg font-medium" x-text="intFmt(post.delivered.reactions)"></span><span class="text-ink-4">/</span><span x-text="intFmt(post.total.reactions)"></span></span>
-                    <span x-show="post.reactionKey && post.reactionKey !== 'mix'" x-text="reactionEmoji(post.reactionKey)" class="text-[14px] ml-0.5"></span>
+                    <span x-show="post.reactionKey && post.reactionKey !== 'mix'" x-text="reactionEmoji(post.reactionKey)" class="text-[13px] ml-0.5"></span>
                     <span x-show="post.reactionKey === 'mix'" class="text-ink-3 ml-0.5">микс</span>
                   </span>
-                  <span class="text-line-2">·</span>
-                  <span class="tabular-nums" x-text="Math.floor(post.currentHour) + '/' + post.totalHours + ' ч'"></span>
-                  <span x-show="post.status==='running'" class="tabular-nums text-ink-4">осталось <span x-text="formatEta(post.totalHours - post.currentHour)"></span></span>
+                  <span class="text-line-2 hidden sm:inline">·</span>
+                  <span class="tabular-nums hidden sm:inline" x-text="Math.floor(post.currentHour) + '/' + post.totalHours + ' ч'"></span>
                 </div>
 
                 <!-- Row 3 -->
-                <div class="mt-3 flex gap-2 pl-[20px]">
-                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 6px;">
+                <div class="mt-2.5 flex gap-2 pl-[18px]">
+                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 5px;">
                     <div class="h-full rounded-full bg-views transition-all duration-500" :style="{width: pctViews(post) + '%'}"></div>
                   </div>
-                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 6px;" x-show="post.total.reactions > 0">
+                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 5px;" x-show="post.total.reactions > 0">
                     <div class="h-full rounded-full bg-reactions transition-all duration-500" :style="{width: pctReactions(post) + '%'}"></div>
                   </div>
                 </div>
@@ -549,43 +560,43 @@ window.Chart = window.Chart || (function(){
   <!-- ═══ TAB: ANALYTICS ═══ -->
   <div x-show="tab==='analytics'" x-cloak class="space-y-6">
 
-    <div class="flex flex-wrap items-end justify-between gap-4">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div class="flex flex-col gap-1.5">
-        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Аналитика</h1>
-        <p class="text-[14px] text-ink-3">Эффективность доставки и вовлечённость аудитории.</p>
+        <h1 class="font-serif text-[28px] sm:text-[32px] font-medium leading-tight text-ink">Аналитика</h1>
+        <p class="text-[13px] sm:text-[14px] text-ink-3">Эффективность доставки и вовлечённость аудитории.</p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
         <div class="seg">
           <button :class="analyticsPeriod===7 && 'on'" @click="analyticsPeriod=7">7 дней</button>
           <button :class="analyticsPeriod===14 && 'on'" @click="analyticsPeriod=14">14 дней</button>
           <button :class="analyticsPeriod===30 && 'on'" @click="analyticsPeriod=30">30 дней</button>
         </div>
-        <button class="btn btn-secondary h-9 px-3 text-[12px] rounded-lg" @click="exportAnalyticsCSV()">
+        <button class="btn btn-secondary h-9 px-3 text-[12px] rounded-lg flex-1 sm:flex-none" @click="exportAnalyticsCSV()">
           Экспорт
         </button>
       </div>
     </div>
 
-    <section class="card">
-      <div class="grid grid-cols-2 divide-x divide-line md:grid-cols-4">
+    <section class="card overflow-hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-line">
         <div class="p-5">
           <p class="stat-label">Всего доставлено</p>
-          <p class="mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views)"></p>
+          <p class="mt-2 sm:mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views)"></p>
           <p class="stat-sub"><span class="tabular-nums text-reactions-fg" x-text="intFmt(analyticsTotals.reactions)"></span> реакций</p>
         </div>
         <div class="p-5">
           <p class="stat-label">Потрачено</p>
-          <p class="mt-3 stat-value tabular-nums">₽ <span x-text="fmtMoney(analyticsTotals.spent)"></span></p>
+          <p class="mt-2 sm:mt-3 stat-value tabular-nums">₽ <span x-text="fmtMoney(analyticsTotals.spent)"></span></p>
           <p class="stat-sub">за период</p>
         </div>
         <div class="p-5">
           <p class="stat-label">Средний ER</p>
-          <p class="mt-3 stat-value tabular-nums" x-text="analyticsTotals.avgER + '%'"></p>
+          <p class="mt-2 sm:mt-3 stat-value tabular-nums" x-text="analyticsTotals.avgER + '%'"></p>
           <p class="stat-sub">вовлечённость</p>
         </div>
         <div class="p-5">
           <p class="stat-label">В среднем в день</p>
-          <p class="mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views / analyticsPeriod)"></p>
+          <p class="mt-2 sm:mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views / analyticsPeriod)"></p>
           <p class="stat-sub">≈ ₽ <span x-text="fmtMoney(analyticsTotals.spent / analyticsPeriod)"></span></p>
         </div>
       </div>
@@ -594,13 +605,13 @@ window.Chart = window.Chart || (function(){
     <section class="card">
       <div class="card-head">
         <h2 class="card-title">Динамика по дням</h2>
-        <div class="flex items-center gap-4 text-[12px]">
-          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-views"></span>Просмотры</span>
-          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-reactions"></span>Реакции</span>
+        <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-[12px]">
+          <span class="flex items-center gap-1.5 text-ink-3"><span class="h-[3px] w-3 sm:w-4 rounded-full bg-views"></span>Просмотры</span>
+          <span class="flex items-center gap-1.5 text-ink-3"><span class="h-[3px] w-3 sm:w-4 rounded-full bg-reactions"></span>Реакции</span>
         </div>
       </div>
-      <div class="p-6 pt-8">
-        <div class="chart-wrapper h-[280px]">
+      <div class="p-4 sm:p-6 pt-6 sm:pt-8">
+        <div class="chart-wrapper h-[220px] sm:h-[280px]">
           <canvas x-ref="analyticsCanvas"></canvas>
         </div>
       </div>
@@ -611,16 +622,16 @@ window.Chart = window.Chart || (function(){
         <div class="card-head"><h2 class="card-title">Топ заданий</h2></div>
         <div class="divide-y divide-line">
           <template x-for="(post, i) in topPosts" :key="post.id">
-            <div class="flex items-center gap-4 px-6 py-4">
+            <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-subtle text-[12px] font-medium tabular-nums text-ink-3" x-text="i + 1"></span>
               <div class="min-w-0 flex-1">
-                <p class="mono truncate text-[13px] text-ink" x-text="post.url"></p>
-                <p class="mt-1 text-[12px] text-ink-4">
+                <p class="mono truncate text-[12px] sm:text-[13px] text-ink" x-text="post.url"></p>
+                <p class="mt-1 text-[11px] sm:text-[12px] text-ink-4">
                   <span class="tabular-nums text-views-fg" x-text="intFmt(post.total.views)"></span> просм
                   <span x-show="post.total.reactions > 0"> · <span class="tabular-nums text-reactions-fg" x-text="intFmt(post.total.reactions)"></span> реакц</span>
                 </p>
               </div>
-              <span class="text-[12px] tabular-nums text-ink-3" x-text="pct(post) + '%'"></span>
+              <span class="text-[11px] sm:text-[12px] tabular-nums text-ink-3" x-text="pct(post) + '%'"></span>
             </div>
           </template>
         </div>
@@ -630,19 +641,19 @@ window.Chart = window.Chart || (function(){
         <div class="card-head"><h2 class="card-title">По реакциям</h2></div>
         <div class="divide-y divide-line">
           <template x-for="r in reactionStats" :key="r.key">
-            <div class="flex items-center gap-4 px-6 py-4">
-              <span class="text-[20px] leading-none w-8 text-center" x-text="r.emoji"></span>
+            <div class="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4">
+              <span class="text-[18px] sm:text-[20px] leading-none w-6 sm:w-8 text-center" x-text="r.emoji"></span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center justify-between mb-1.5">
-                  <p class="text-[13px] font-medium text-ink" x-text="r.name"></p>
-                  <p class="text-[12px] font-medium tabular-nums text-reactions-fg" x-text="intFmt(r.count)"></p>
+                  <p class="text-[12px] sm:text-[13px] font-medium text-ink" x-text="r.name"></p>
+                  <p class="text-[11px] sm:text-[12px] font-medium tabular-nums text-reactions-fg" x-text="intFmt(r.count)"></p>
                 </div>
-                <div class="h-[6px] overflow-hidden rounded-full bg-subtle">
+                <div class="h-[5px] sm:h-[6px] overflow-hidden rounded-full bg-subtle">
                   <div class="h-full rounded-full bg-reactions" :style="{width: r.pct + '%'}"></div>
                 </div>
               </div>
               <div class="text-right w-10">
-                <p class="text-[12px] tabular-nums text-ink-3" x-text="r.pct + '%'"></p>
+                <p class="text-[11px] sm:text-[12px] tabular-nums text-ink-3" x-text="r.pct + '%'"></p>
               </div>
             </div>
           </template>
@@ -656,19 +667,19 @@ window.Chart = window.Chart || (function(){
 
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="flex flex-col gap-1.5">
-        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Каналы</h1>
-        <p class="text-[14px] text-ink-3">Белый список автодоставки.</p>
+        <h1 class="font-serif text-[28px] sm:text-[32px] font-medium leading-tight text-ink">Каналы</h1>
+        <p class="text-[13px] sm:text-[14px] text-ink-3">Белый список автодоставки.</p>
       </div>
-      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg" @click="addChannelOpen=true">
+      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg w-full sm:w-auto" @click="addChannelOpen=true">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Добавить
       </button>
     </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-6 py-5 shadow-sm">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-4 py-4 sm:px-6 sm:py-5 shadow-sm">
       <div>
-        <p class="text-[15px] font-medium text-ink">Автоподхват новых публикаций</p>
-        <p class="mt-1 text-[13px] text-ink-3">
+        <p class="text-[14px] sm:text-[15px] font-medium text-ink">Автоподхват новых публикаций</p>
+        <p class="mt-1 text-[12px] sm:text-[13px] text-ink-3">
           Проверка каждые <span x-text="settings.pickupInterval"></span> мин · последняя — <span x-text="lastPickup"></span>
         </p>
       </div>
@@ -682,12 +693,12 @@ window.Chart = window.Chart || (function(){
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="relative">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="relative flex-1 sm:max-w-xs">
         <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" x-model="channelQuery" class="field h-9 w-64 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск канала" autocomplete="off"/>
+        <input type="text" x-model="channelQuery" class="field h-9 w-full pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск канала" autocomplete="off"/>
       </div>
-      <div class="ml-auto text-[12px] text-ink-4">
+      <div class="sm:ml-auto text-[12px] text-ink-4 text-right">
         <span class="tabular-nums text-ink-2" x-text="channelsFiltered.length"></span> из <span class="tabular-nums" x-text="channels.length"></span>
       </div>
     </div>
@@ -695,10 +706,10 @@ window.Chart = window.Chart || (function(){
     <section class="card">
       <div class="divide-y divide-line">
         <template x-for="ch in channelsFiltered" :key="ch.id">
-          <div class="flex items-center gap-5 px-6 py-4">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 px-4 sm:px-6 py-3 sm:py-4">
             <div class="min-w-0 flex-1">
-              <a class="mono text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://max.ru/' + ch.handle" target="_blank" rel="noopener" x-text="'max.ru/' + ch.handle"></a>
-              <p class="mt-1.5 flex items-center gap-2.5 text-[12px] text-ink-4">
+              <a class="mono text-[13px] sm:text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://max.ru/' + ch.handle" target="_blank" rel="noopener" x-text="'max.ru/' + ch.handle"></a>
+              <p class="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-2 sm:gap-2.5 text-[11px] sm:text-[12px] text-ink-4">
                 <span class="tabular-nums"><span class="text-ink-2" x-text="intFmt(ch.subs)"></span> подп</span>
                 <span>·</span>
                 <span>ER <span class="text-ink-2" x-text="ch.err + '%'"></span></span>
@@ -706,10 +717,12 @@ window.Chart = window.Chart || (function(){
                 <span class="tabular-nums"><span class="text-views-fg" x-text="intFmt(ch.delivered)"></span> доставлено</span>
               </p>
             </div>
-            <button class="toggle" :class="ch.status==='active' ? 'on' : 'off'" role="switch" :aria-checked="ch.status==='active'" @click="toggleChannel(ch)"></button>
-            <button class="icon-btn danger h-8 w-8" @click="removeChannel(ch)" title="Удалить">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-            </button>
+            <div class="flex items-center gap-3 ml-auto">
+              <button class="toggle" :class="ch.status==='active' ? 'on' : 'off'" role="switch" :aria-checked="ch.status==='active'" @click="toggleChannel(ch)"></button>
+              <button class="icon-btn danger h-8 w-8" @click="removeChannel(ch)" title="Удалить">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              </button>
+            </div>
           </div>
         </template>
       </div>
@@ -722,26 +735,26 @@ window.Chart = window.Chart || (function(){
 
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div class="flex flex-col gap-1.5">
-        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Шаблоны</h1>
-        <p class="text-[14px] text-ink-3">Сохранённые сценарии распределения активности.</p>
+        <h1 class="font-serif text-[28px] sm:text-[32px] font-medium leading-tight text-ink">Шаблоны</h1>
+        <p class="text-[13px] sm:text-[14px] text-ink-3">Сохранённые сценарии распределения активности.</p>
       </div>
-      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg" @click="openTemplateDrawer()">
+      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg w-full sm:w-auto" @click="openTemplateDrawer()">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Создать шаблон
       </button>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <div class="relative">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="relative flex-1 sm:max-w-xs">
         <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" x-model="templateQuery" class="field h-9 w-64 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск шаблона" autocomplete="off"/>
+        <input type="text" x-model="templateQuery" class="field h-9 w-full pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск шаблона" autocomplete="off"/>
       </div>
-      <div class="ml-auto text-[12px] text-ink-4">
+      <div class="sm:ml-auto text-[12px] text-ink-4 text-right">
         <span class="tabular-nums text-ink-2" x-text="templatesFiltered.length"></span> из <span class="tabular-nums" x-text="templates.length"></span>
       </div>
     </div>
 
-    <div x-show="templatesFiltered.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-24 text-center">
+    <div x-show="templatesFiltered.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-24 text-center px-4">
       <div class="flex h-16 w-16 items-center justify-center rounded-full bg-subtle">
         <svg class="h-7 w-7 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </div>
@@ -750,13 +763,13 @@ window.Chart = window.Chart || (function(){
       <button class="btn btn-primary mt-6 px-6" @click="openTemplateDrawer()">Создать шаблон</button>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <template x-for="tpl in templatesFiltered" :key="tpl.id">
-        <div class="card p-5 flex flex-col gap-4 hover:shadow-pop transition-shadow">
+        <div class="card p-4 sm:p-5 flex flex-col gap-4 hover:shadow-pop transition-shadow">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="text-[15px] font-medium text-ink truncate" x-text="tpl.name"></p>
-              <p class="mt-1 text-[12px] text-ink-3" x-text="tpl.description || 'Без описания'"></p>
+              <p class="mt-1 text-[12px] text-ink-3 line-clamp-2" x-text="tpl.description || 'Без описания'"></p>
             </div>
             <span class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium"
                   :class="tpl.mode === 'both' ? 'bg-accent-bg text-accent-hi' : tpl.mode === 'views' ? 'bg-views-bg text-views-fg' : 'bg-reactions-bg text-reactions-fg'"
@@ -774,20 +787,20 @@ window.Chart = window.Chart || (function(){
 
           <div class="grid grid-cols-3 gap-2 text-center">
             <div class="rounded-lg bg-subtle py-2">
-              <p class="text-[11px] text-ink-4">Дней</p>
-              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="tpl.duration"></p>
+              <p class="text-[10px] sm:text-[11px] text-ink-4">Дней</p>
+              <p class="text-[13px] sm:text-[14px] font-medium tabular-nums text-ink" x-text="tpl.duration"></p>
             </div>
             <div class="rounded-lg bg-subtle py-2">
-              <p class="text-[11px] text-ink-4">Этапов</p>
-              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="tpl.stages.length"></p>
+              <p class="text-[10px] sm:text-[11px] text-ink-4">Этапов</p>
+              <p class="text-[13px] sm:text-[14px] font-medium tabular-nums text-ink" x-text="tpl.stages.length"></p>
             </div>
             <div class="rounded-lg bg-subtle py-2">
-              <p class="text-[11px] text-ink-4">Просм/день</p>
-              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="intFmt(tplDayViews(tpl))"></p>
+              <p class="text-[10px] sm:text-[11px] text-ink-4">Просм/день</p>
+              <p class="text-[13px] sm:text-[14px] font-medium tabular-nums text-ink" x-text="intFmt(tplDayViews(tpl))"></p>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 pt-1">
+          <div class="flex items-center gap-2 pt-1 mt-auto">
             <button class="btn btn-primary h-8 flex-1 text-[12px] rounded-lg" @click="applyTemplate(tpl)">Применить</button>
             <button class="btn btn-secondary h-8 px-3 text-[12px] rounded-lg" @click="editTemplate(tpl)">Изм.</button>
             <button class="icon-btn danger h-8 w-8" @click="askRemoveTemplate(tpl)" title="Удалить">
@@ -802,22 +815,22 @@ window.Chart = window.Chart || (function(){
   <!-- ═══ TAB: SETTINGS ═══ -->
   <div x-show="tab==='settings'" x-cloak class="space-y-6">
     <div class="flex flex-col gap-1.5">
-      <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Настройки</h1>
-      <p class="text-[14px] text-ink-3">SMM API, автоподхват, уведомления.</p>
+      <h1 class="font-serif text-[28px] sm:text-[32px] font-medium leading-tight text-ink">Настройки</h1>
+      <p class="text-[13px] sm:text-[14px] text-ink-3">SMM API, автоподхват, уведомления.</p>
     </div>
 
     <div class="max-w-[700px] space-y-6">
       <section class="card">
         <div class="card-head">
           <h2 class="card-title">SMM API</h2>
-          <span class="flex items-center gap-2 text-[12px] font-medium text-ok"><span class="dot bg-ok"></span>Подключено</span>
+          <span class="flex items-center gap-2 text-[11px] sm:text-[12px] font-medium text-ok"><span class="dot bg-ok"></span>Подключено</span>
         </div>
-        <div class="card-body space-y-5">
+        <div class="card-body space-y-4 sm:space-y-5">
           <div>
             <label class="label" for="apiKey">Ключ</label>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input id="apiKey" :type="showKey ? 'text' : 'password'" x-model="settings.apiKey" class="field field-mono text-[13px]"/>
-              <button class="btn btn-secondary h-9 px-3" @click="showKey=!showKey">
+              <button class="btn btn-secondary h-9 px-3 shrink-0" @click="showKey=!showKey">
                 <span x-text="showKey ? 'Скрыть' : 'Показать'" class="text-[12px]"></span>
               </button>
             </div>
@@ -826,24 +839,24 @@ window.Chart = window.Chart || (function(){
             <label class="label" for="endpoint">Endpoint</label>
             <input id="endpoint" x-model="settings.endpoint" class="field field-mono text-[12px]"/>
           </div>
-          <p class="text-[12px] text-ink-4 pt-2">Проверено <span x-text="syncedAt"></span></p>
+          <p class="text-[12px] text-ink-4 pt-1">Проверено <span x-text="syncedAt"></span></p>
         </div>
       </section>
 
       <section class="card">
         <div class="card-head">
           <h2 class="card-title">Баланс SMM API</h2>
-          <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="text-[12px] font-medium text-accent hover:underline inline-flex items-center gap-1">
+          <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="text-[11px] sm:text-[12px] font-medium text-accent hover:underline inline-flex items-center gap-1">
             Пополнить на SMMPrime
             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           </a>
         </div>
         <div class="card-body">
-          <div class="flex items-baseline justify-between">
-            <p class="text-[32px] font-medium tabular-nums tracking-tight text-ink">₽ <span x-text="fmtMoney(balance)"></span></p>
-            <p class="text-[12px] text-ink-4">≈ <span class="tabular-nums" x-text="intFmt(balance * 20)"></span> просм · <span class="tabular-nums" x-text="intFmt(balance / 0.15)"></span> реакц</p>
+          <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+            <p class="text-[28px] sm:text-[32px] font-medium tabular-nums tracking-tight text-ink">₽ <span x-text="fmtMoney(balance)"></span></p>
+            <p class="text-[11px] sm:text-[12px] text-ink-4">≈ <span class="tabular-nums" x-text="intFmt(balance * 20)"></span> просм · <span class="tabular-nums" x-text="intFmt(balance / 0.15)"></span> реакц</p>
           </div>
-          <p class="mt-4 text-[12px] leading-relaxed text-ink-4">
+          <p class="mt-3 sm:mt-4 text-[11px] sm:text-[12px] leading-relaxed text-ink-4">
             Баланс синхронизируется с личным кабинетом SMMPrime автоматически. Пополнение доступно на стороне провайдера.
           </p>
         </div>
@@ -855,34 +868,34 @@ window.Chart = window.Chart || (function(){
 
 <!-- ═══ BULK ACTION BAR ═══ -->
 <div x-show="selected.length > 0" x-cloak x-transition.opacity.duration.150ms
-     class="fixed left-1/2 -translate-x-1/2 bottom-6 z-40 flex items-center gap-4 rounded-xl border border-line bg-surface px-5 py-3 shadow-pop">
-  <span class="text-[13px] text-ink-2">Выбрано: <span class="font-medium text-ink tabular-nums" x-text="selected.length"></span></span>
-  <span class="h-5 w-px bg-line"></span>
-  <button class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('pause')">Приостановить</button>
-  <button class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('resume')">Продолжить</button>
-  <button class="text-[13px] font-medium text-err hover:text-err/80 transition-colors" @click="bulkAction('delete')">Удалить</button>
-  <span class="h-5 w-px bg-line"></span>
-  <button class="text-[13px] text-ink-3 hover:text-ink transition-colors" @click="selected=[]">Сбросить</button>
+     class="fixed left-1/2 -translate-x-1/2 bottom-4 sm:bottom-6 z-40 flex flex-wrap justify-center items-center gap-3 sm:gap-4 rounded-xl border border-line bg-surface px-4 py-2.5 sm:px-5 sm:py-3 shadow-pop w-[calc(100%-2rem)] sm:w-auto">
+  <span class="text-[12px] sm:text-[13px] text-ink-2">Выбрано: <span class="font-medium text-ink tabular-nums" x-text="selected.length"></span></span>
+  <span class="hidden sm:block h-5 w-px bg-line"></span>
+  <button class="text-[12px] sm:text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('pause')">Приостановить</button>
+  <button class="text-[12px] sm:text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('resume')">Продолжить</button>
+  <button class="text-[12px] sm:text-[13px] font-medium text-err hover:text-err/80 transition-colors" @click="bulkAction('delete')">Удалить</button>
+  <span class="hidden sm:block h-5 w-px bg-line"></span>
+  <button class="text-[12px] sm:text-[13px] text-ink-3 hover:text-ink transition-colors" @click="selected=[]">Сбросить</button>
 </div>
 
-<!-- ═══ DRAWER ═══ -->
+<!-- ═══ DRAWER (Новое задание) ═══ -->
 <div x-show="drawerOpen" x-cloak class="fixed inset-0 z-50">
   <div x-show="drawerOpen" x-transition.opacity.duration.200ms class="absolute inset-0 bg-ink/20 backdrop-blur-sm" @click="closeDrawer()"></div>
 
   <div x-show="drawerOpen"
        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-       class="absolute right-0 top-0 bottom-0 flex w-full max-w-[500px] flex-col border-l border-line bg-surface shadow-2xl rounded-l-2xl overflow-hidden">
+       class="absolute right-0 top-0 bottom-0 flex w-full max-w-full sm:max-w-[500px] flex-col border-l border-line bg-surface shadow-2xl sm:rounded-l-2xl overflow-hidden">
 
-    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
-      <h2 class="font-serif text-[20px] font-medium text-ink" x-text="editingPost ? 'Редактировать задание' : 'Новое задание'"></h2>
+    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
+      <h2 class="font-serif text-[18px] sm:text-[20px] font-medium text-ink" x-text="editingPost ? 'Редактировать задание' : 'Новое задание'"></h2>
       <button class="icon-btn" @click="closeDrawer()">
         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
     <div class="flex-1 overflow-y-auto">
-      <div x-show="formError" x-cloak class="mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
+      <div x-show="formError" x-cloak class="mx-4 sm:mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
         <p class="text-[12px] font-medium text-err" x-text="formError"></p>
       </div>
 
@@ -896,10 +909,10 @@ window.Chart = window.Chart || (function(){
       </section>
 
       <section class="drawer-section">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
           <label class="label mb-0">Длительность</label>
           <div class="relative" x-data="{open:false}">
-            <button type="button" @click="open=!open" class="flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent-hi transition-colors">
+            <button type="button" @click="open=!open" class="flex items-center gap-1.5 text-[11px] sm:text-[12px] font-medium text-accent hover:text-accent-hi transition-colors">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
               Из шаблона
               <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -913,9 +926,9 @@ window.Chart = window.Chart || (function(){
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
           <template x-for="d in [7, 14, 30]" :key="d">
-            <button type="button" @click="form.duration=d" class="h-10 rounded-xl border text-[13px] font-medium tabular-nums transition-all"
+            <button type="button" @click="form.duration=d" class="h-10 rounded-xl border text-[12px] sm:text-[13px] font-medium tabular-nums transition-all"
                     :class="form.duration===d ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
                     x-text="d + ' дней'"></button>
           </template>
@@ -924,9 +937,9 @@ window.Chart = window.Chart || (function(){
 
       <section class="drawer-section">
         <label class="label">Что доставлять</label>
-        <div class="grid grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
           <template x-for="m in [{k:'views',n:'Просмотры'},{k:'reactions',n:'Реакции'},{k:'both',n:'Оба'}]" :key="m.k">
-            <button type="button" @click="form.mode=m.k" class="h-10 rounded-xl border text-[13px] font-medium transition-all"
+            <button type="button" @click="form.mode=m.k" class="h-10 rounded-xl border text-[12px] sm:text-[13px] font-medium transition-all"
                     :class="form.mode===m.k ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
                     x-text="m.n"></button>
           </template>
@@ -936,13 +949,13 @@ window.Chart = window.Chart || (function(){
       <section class="drawer-section" x-show="form.mode !== 'views'" x-cloak>
         <div class="flex items-center justify-between">
           <label class="label mb-0">Тип реакции</label>
-          <button type="button" @click="toggleMix()" class="text-[12px] font-medium transition-colors"
+          <button type="button" @click="toggleMix()" class="text-[11px] sm:text-[12px] font-medium transition-colors"
                   :class="form.mixMode ? 'text-accent' : 'text-ink-3 hover:text-ink'">
             <span x-show="!form.mixMode">Включить микс</span>
             <span x-show="form.mixMode" x-cloak>✓ Микс: <span x-text="form.reactions.length"></span></span>
           </button>
         </div>
-        <div class="mt-3 grid grid-cols-4 gap-2.5">
+        <div class="mt-3 grid grid-cols-4 gap-2 sm:gap-2.5">
           <template x-for="r in reactions" :key="r.key">
             <button type="button" @click="selectReaction(r.key)" class="emoji-tile" :class="isReactionSelected(r.key) && 'on'">
               <span class="emoji" x-text="r.emoji"></span>
@@ -957,7 +970,7 @@ window.Chart = window.Chart || (function(){
           <label class="label mb-0">Распределение</label>
           <span class="text-[11px] text-ink-4">24 часа</span>
         </div>
-        <div class="mt-3 flex h-20 items-end gap-[3px] rounded-xl bg-subtle px-3 pb-2 pt-3">
+        <div class="mt-3 flex h-20 items-end gap-[2px] sm:gap-[3px] rounded-xl bg-subtle px-2 sm:px-3 pb-2 pt-3">
           <template x-for="(h, i) in expandedPlan" :key="i">
             <div class="flex-1 flex flex-col justify-end gap-[1px]" style="height: 100%;">
               <div class="w-full rounded-t-sm bg-reactions transition-all" :style="{height: (form.mode !== 'views' ? barHeightOf(h.reactions, maxVolume) : 0) + '%'}"></div>
@@ -974,19 +987,19 @@ window.Chart = window.Chart || (function(){
         </div>
         <div class="mt-3 space-y-2">
           <template x-for="(stage, i) in form.stages" :key="i">
-            <div class="flex items-center gap-2">
-              <input type="number" min="0" max="23" class="field field-mono h-9 w-14 text-center" x-model.number="stage.hour"/>
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <input type="number" min="0" max="23" class="field field-mono h-9 w-12 sm:w-14 text-center px-1" x-model.number="stage.hour"/>
               <span class="text-[11px] text-ink-4">ч</span>
               <template x-if="form.mode !== 'reactions'">
-                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.views" placeholder="просм/мин"/>
+                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center px-1 sm:px-2" x-model.number="stage.views" placeholder="просм/мин"/>
               </template>
               <template x-if="form.mode === 'both'">
                 <span class="text-[11px] text-ink-4">+</span>
               </template>
               <template x-if="form.mode !== 'views'">
-                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.reactions" placeholder="реакц/мин"/>
+                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center px-1 sm:px-2" x-model.number="stage.reactions" placeholder="реакц/мин"/>
               </template>
-              <button type="button" class="icon-btn danger h-9 w-9" :disabled="form.stages.length===1" :class="form.stages.length===1 && 'opacity-30 pointer-events-none'" @click="removeStage(i)">
+              <button type="button" class="icon-btn danger h-9 w-9 shrink-0" :disabled="form.stages.length===1" :class="form.stages.length===1 && 'opacity-30 pointer-events-none'" @click="removeStage(i)">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
@@ -999,7 +1012,7 @@ window.Chart = window.Chart || (function(){
       </section>
 
       <section class="drawer-section bg-subtle/50">
-        <div class="space-y-2 text-[13px]">
+        <div class="space-y-2 text-[12px] sm:text-[13px]">
           <div class="flex items-center justify-between">
             <span class="text-ink-3">Объём за весь срок</span>
             <span class="tabular-nums font-medium text-ink">
@@ -1019,11 +1032,11 @@ window.Chart = window.Chart || (function(){
       </section>
     </div>
 
-    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-6 bg-surface">
-      <button class="btn btn-ghost" @click="closeDrawer()">Отмена</button>
-      <div class="flex items-center gap-3">
-        <button x-show="editingPost" class="btn btn-secondary" @click="saveEdit()">Сохранить</button>
-        <button x-show="!editingPost" class="btn btn-primary min-w-[140px]" @click="launch()" :disabled="remaining < 0">
+    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-4 sm:px-6 bg-surface">
+      <button class="btn btn-ghost hidden sm:inline-flex" @click="closeDrawer()">Отмена</button>
+      <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        <button x-show="editingPost" class="btn btn-secondary flex-1 sm:flex-none" @click="saveEdit()">Сохранить</button>
+        <button x-show="!editingPost" class="btn btn-primary flex-1 sm:flex-none sm:min-w-[140px]" @click="launch()" :disabled="remaining < 0">
           Запустить
         </button>
       </div>
@@ -1035,8 +1048,8 @@ window.Chart = window.Chart || (function(){
 <div x-show="addChannelOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
   <div x-show="addChannelOpen" x-transition.opacity.duration.150ms class="absolute inset-0 bg-ink/30 backdrop-blur-sm" @click="addChannelOpen=false"></div>
   <div x-show="addChannelOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
-       class="relative w-full max-w-[440px] rounded-2xl border border-line bg-surface p-6 shadow-pop">
-    <h3 class="font-serif text-[20px] font-medium text-ink">Добавить канал</h3>
+       class="relative w-full max-w-[400px] rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-pop">
+    <h3 class="font-serif text-[18px] sm:text-[20px] font-medium text-ink">Добавить канал</h3>
     <p class="mt-1 text-[12px] text-ink-3">Канал попадёт в белый список автоподхвата</p>
     <div x-show="channelError" x-cloak class="mt-3 rounded-xl border border-err/30 bg-err-bg px-3 py-2">
       <p class="text-[12px] text-err" x-text="channelError"></p>
@@ -1046,14 +1059,13 @@ window.Chart = window.Chart || (function(){
         <label class="label">Ссылка на канал</label>
         <input type="text" class="field field-mono text-[13px]" x-model="channelForm.link" placeholder="max.ru/mychannel" spellcheck="false"/>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" class="btn btn-secondary" @click="addChannelOpen=false">Отмена</button>
-        <button type="submit" class="btn btn-primary">Добавить</button>
+      <div class="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-secondary w-full sm:w-auto" @click="addChannelOpen=false">Отмена</button>
+        <button type="submit" class="btn btn-primary w-full sm:w-auto">Добавить</button>
       </div>
     </form>
   </div>
 </div>
-
 
 <!-- ═══ TEMPLATE DRAWER ═══ -->
 <div x-show="templateDrawerOpen" x-cloak class="fixed inset-0 z-50">
@@ -1061,17 +1073,17 @@ window.Chart = window.Chart || (function(){
   <div x-show="templateDrawerOpen"
        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-       class="absolute right-0 top-0 bottom-0 flex w-full max-w-[480px] flex-col border-l border-line bg-surface shadow-2xl rounded-l-2xl overflow-hidden">
+       class="absolute right-0 top-0 bottom-0 flex w-full max-w-full sm:max-w-[480px] flex-col border-l border-line bg-surface shadow-2xl sm:rounded-l-2xl overflow-hidden">
 
-    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
-      <h2 class="font-serif text-[20px] font-medium text-ink" x-text="editingTemplate ? 'Редактировать шаблон' : 'Новый шаблон'"></h2>
+    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-4 sm:px-6">
+      <h2 class="font-serif text-[18px] sm:text-[20px] font-medium text-ink" x-text="editingTemplate ? 'Редактировать шаблон' : 'Новый шаблон'"></h2>
       <button class="icon-btn" @click="templateDrawerOpen=false">
         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
     <div class="flex-1 overflow-y-auto">
-      <div x-show="templateError" x-cloak class="mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
+      <div x-show="templateError" x-cloak class="mx-4 sm:mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
         <p class="text-[12px] font-medium text-err" x-text="templateError"></p>
       </div>
 
@@ -1087,9 +1099,9 @@ window.Chart = window.Chart || (function(){
 
       <section class="drawer-section">
         <label class="label">Длительность</label>
-        <div class="grid grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
           <template x-for="d in [7, 14, 30]" :key="d">
-            <button type="button" @click="tplForm.duration=d" class="h-10 rounded-xl border text-[13px] font-medium tabular-nums transition-all"
+            <button type="button" @click="tplForm.duration=d" class="h-10 rounded-xl border text-[12px] sm:text-[13px] font-medium tabular-nums transition-all"
                     :class="tplForm.duration===d ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
                     x-text="d + ' дней'"></button>
           </template>
@@ -1098,9 +1110,9 @@ window.Chart = window.Chart || (function(){
 
       <section class="drawer-section">
         <label class="label">Что доставлять</label>
-        <div class="grid grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-3 gap-2 sm:gap-2.5">
           <template x-for="m in [{k:'views',n:'Просмотры'},{k:'reactions',n:'Реакции'},{k:'both',n:'Оба'}]" :key="m.k">
-            <button type="button" @click="tplForm.mode=m.k" class="h-10 rounded-xl border text-[13px] font-medium transition-all"
+            <button type="button" @click="tplForm.mode=m.k" class="h-10 rounded-xl border text-[12px] sm:text-[13px] font-medium transition-all"
                     :class="tplForm.mode===m.k ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
                     x-text="m.n"></button>
           </template>
@@ -1114,19 +1126,19 @@ window.Chart = window.Chart || (function(){
         </div>
         <div class="mt-3 space-y-2">
           <template x-for="(stage, i) in tplForm.stages" :key="i">
-            <div class="flex items-center gap-2">
-              <input type="number" min="0" max="23" class="field field-mono h-9 w-14 text-center" x-model.number="stage.hour"/>
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <input type="number" min="0" max="23" class="field field-mono h-9 w-12 sm:w-14 text-center px-1" x-model.number="stage.hour"/>
               <span class="text-[11px] text-ink-4">ч</span>
               <template x-if="tplForm.mode !== 'reactions'">
-                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.views" placeholder="просм/мин"/>
+                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center px-1 sm:px-2" x-model.number="stage.views" placeholder="просм/мин"/>
               </template>
               <template x-if="tplForm.mode === 'both'">
                 <span class="text-[11px] text-ink-4">+</span>
               </template>
               <template x-if="tplForm.mode !== 'views'">
-                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.reactions" placeholder="реакц/мин"/>
+                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center px-1 sm:px-2" x-model.number="stage.reactions" placeholder="реакц/мин"/>
               </template>
-              <button type="button" class="icon-btn danger h-9 w-9" :disabled="tplForm.stages.length===1" :class="tplForm.stages.length===1 && 'opacity-30 pointer-events-none'" @click="tplForm.stages.splice(i,1)">
+              <button type="button" class="icon-btn danger h-9 w-9 shrink-0" :disabled="tplForm.stages.length===1" :class="tplForm.stages.length===1 && 'opacity-30 pointer-events-none'" @click="tplForm.stages.splice(i,1)">
                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
@@ -1140,7 +1152,7 @@ window.Chart = window.Chart || (function(){
       </section>
 
       <section class="drawer-section bg-subtle/50">
-        <div class="space-y-2 text-[13px]">
+        <div class="space-y-2 text-[12px] sm:text-[13px]">
           <div class="flex items-center justify-between">
             <span class="text-ink-3">Объём за весь срок</span>
             <span class="tabular-nums font-medium text-ink">
@@ -1156,9 +1168,9 @@ window.Chart = window.Chart || (function(){
       </section>
     </div>
 
-    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-6 bg-surface">
-      <button class="btn btn-ghost" @click="templateDrawerOpen=false">Отмена</button>
-      <button class="btn btn-primary min-w-[140px]" @click="saveTemplate()" x-text="editingTemplate ? 'Сохранить' : 'Создать'"></button>
+    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-4 sm:px-6 bg-surface">
+      <button class="btn btn-ghost hidden sm:inline-flex" @click="templateDrawerOpen=false">Отмена</button>
+      <button class="btn btn-primary w-full sm:w-auto sm:min-w-[140px]" @click="saveTemplate()" x-text="editingTemplate ? 'Сохранить' : 'Создать'"></button>
     </div>
   </div>
 </div>
@@ -1167,26 +1179,26 @@ window.Chart = window.Chart || (function(){
 <div x-show="confirm.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
   <div x-show="confirm.open" x-transition.opacity.duration.150ms class="absolute inset-0 bg-ink/30 backdrop-blur-sm" @click="confirm.open=false"></div>
   <div x-show="confirm.open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
-       class="relative w-full max-w-[400px] rounded-2xl border border-line bg-surface p-6 shadow-pop">
-    <h3 class="font-serif text-[20px] font-medium text-ink" x-text="confirm.title"></h3>
-    <p class="mt-2 text-[13px] leading-relaxed text-ink-3" x-text="confirm.message"></p>
-    <div class="mt-6 flex justify-end gap-2">
-      <button class="btn btn-secondary" @click="confirm.open=false">Отмена</button>
-      <button class="btn btn-danger" x-text="confirm.label" @click="runConfirm()"></button>
+       class="relative w-full max-w-[380px] rounded-2xl border border-line bg-surface p-5 sm:p-6 shadow-pop">
+    <h3 class="font-serif text-[18px] sm:text-[20px] font-medium text-ink" x-text="confirm.title"></h3>
+    <p class="mt-2 text-[12px] sm:text-[13px] leading-relaxed text-ink-3" x-text="confirm.message"></p>
+    <div class="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-2">
+      <button class="btn btn-secondary w-full sm:w-auto" @click="confirm.open=false">Отмена</button>
+      <button class="btn btn-danger w-full sm:w-auto" x-text="confirm.label" @click="runConfirm()"></button>
     </div>
   </div>
 </div>
 
 <!-- ═══ TOASTS ═══ -->
-<div class="fixed bottom-6 right-6 z-[60] flex w-[min(92vw,340px)] flex-col gap-2" aria-live="polite">
+<div class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[60] flex w-[calc(100%-2rem)] sm:w-[min(92vw,340px)] flex-col gap-2" aria-live="polite">
   <template x-for="t in toasts" :key="t.id">
     <div x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
          x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
          class="flex items-start gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-pop">
       <span class="dot mt-1.5 shrink-0" :class="t.type==='success' ? 'bg-ok' : t.type==='error' ? 'bg-err' : t.type==='warning' ? 'bg-warn' : 'bg-accent'"></span>
       <div class="min-w-0 flex-1">
-        <p class="text-[13px] font-medium leading-tight text-ink" x-text="t.title"></p>
-        <p x-show="t.desc" class="mt-1 text-[12px] leading-snug text-ink-3" x-text="t.desc"></p>
+        <p class="text-[12px] sm:text-[13px] font-medium leading-tight text-ink" x-text="t.title"></p>
+        <p x-show="t.desc" class="mt-1 text-[11px] sm:text-[12px] leading-snug text-ink-3" x-text="t.desc"></p>
       </div>
     </div>
   </template>
@@ -1335,11 +1347,10 @@ function app() {
     },
 
     chartReady() { return typeof Chart !== 'undefined' && Chart && typeof Chart === 'function' || (window.Chart && window.Chart.defaults); },
-    isFallbackChart() { return window.Chart && window.Chart.__set !== undefined; },
 
     tryDrawHourly(attempt) {
       if (this.chartReady()) { this.waitAndDrawHourly(); return; }
-      if (attempt > 30) return; // 15 сек ждём
+      if (attempt > 30) return;
       setTimeout(() => this.tryDrawHourly(attempt + 1), 500);
     },
     tryDrawAnalytics(attempt) {
@@ -1349,13 +1360,13 @@ function app() {
     },
 
     waitAndDrawHourly() {
-      // Ждем, пока DOM отрисуется и контейнер получит размеры
       this.$nextTick(() => {
+        // Увеличенный таймаут для мобильных браузеров
         setTimeout(() => {
           if (this.$refs.hourlyCanvas && this.$refs.hourlyCanvas.clientWidth > 0) {
             this.drawHourlyChart();
           }
-        }, 50);
+        }, 100);
       });
     },
 
@@ -1365,7 +1376,7 @@ function app() {
           if (this.$refs.analyticsCanvas && this.$refs.analyticsCanvas.clientWidth > 0) {
             this.drawAnalyticsChart();
           }
-        }, 50);
+        }, 100);
       });
     },
 
@@ -1384,7 +1395,7 @@ function app() {
       
       Chart.defaults.font.family = "Inter, system-ui, sans-serif";
       Chart.defaults.color = '#A8A29E';
-      Chart.defaults.font.size = 11;
+      Chart.defaults.font.size = 10;
       
       const ctx = this.$refs.hourlyCanvas.getContext('2d');
       
@@ -1393,8 +1404,8 @@ function app() {
         data: {
           labels: this.hourlyViews.map((_, i) => i),
           datasets: [
-            { label: 'Просмотры', data: this.hourlyViews, backgroundColor: '#7F9AB3', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.9 },
-            { label: 'Реакции', data: this.hourlyReactions, backgroundColor: '#D9A594', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.9 }
+            { label: 'Просмотры', data: this.hourlyViews, backgroundColor: '#7F9AB3', borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.9 },
+            { label: 'Реакции', data: this.hourlyReactions, backgroundColor: '#D9A594', borderRadius: 3, barPercentage: 0.7, categoryPercentage: 0.9 }
           ]
         },
         options: {
@@ -1404,7 +1415,7 @@ function app() {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#1A1A1A', titleColor: '#FAF8F5', bodyColor: '#E8E4DB',
-              padding: 12, cornerRadius: 8, boxPadding: 6,
+              padding: 10, cornerRadius: 8, boxPadding: 4,
               titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 },
               callbacks: {
                 title: (items) => items[0].label + ':00',
@@ -1414,7 +1425,7 @@ function app() {
           },
           scales: {
             x: { stacked: false, grid: { display: false }, border: { display: false },
-                 ticks: { maxTicksLimit: 7, font: { size: 10 }, color: '#A8A29E', padding: 6,
+                 ticks: { maxTicksLimit: 6, font: { size: 9 }, color: '#A8A29E', padding: 4,
                           callback: (v, i) => [0, 4, 8, 12, 16, 20].includes(i) ? i + ':00' : '' } },
             y: { stacked: false, display: false, beginAtZero: true }
           }
@@ -1456,7 +1467,7 @@ function app() {
       const data = this.analyticsData;
       Chart.defaults.font.family = "Inter, system-ui, sans-serif";
       Chart.defaults.color = '#A8A29E';
-      Chart.defaults.font.size = 11;
+      Chart.defaults.font.size = 10;
       
       const ctx = this.$refs.analyticsCanvas.getContext('2d');
       
@@ -1489,14 +1500,14 @@ function app() {
             legend: { display: false },
             tooltip: {
               backgroundColor: '#1A1A1A', titleColor: '#FAF8F5', bodyColor: '#E8E4DB',
-              padding: 12, cornerRadius: 8, boxPadding: 6, usePointStyle: true, pointStyle: 'circle',
+              padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true, pointStyle: 'circle',
               titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 },
               callbacks: { label: (item) => '  ' + item.dataset.label + '  ' + Math.round(item.parsed.y).toLocaleString('ru-RU') }
             }
           },
           scales: {
-            x: { grid: { display: false }, border: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#A8A29E', padding: 6 } },
-            y: { beginAtZero: true, grid: { color: '#F3F0EB', drawTicks: false }, border: { display: false }, ticks: { maxTicksLimit: 4, padding: 8, font: { size: 10 }, color: '#A8A29E', callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v } }
+            x: { grid: { display: false }, border: { display: false }, ticks: { maxTicksLimit: 6, font: { size: 9 }, color: '#A8A29E', padding: 4 } },
+            y: { beginAtZero: true, grid: { color: '#F3F0EB', drawTicks: false }, border: { display: false }, ticks: { maxTicksLimit: 4, padding: 6, font: { size: 9 }, color: '#A8A29E', callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v } }
           }
         }
       });
@@ -1511,7 +1522,7 @@ function app() {
         rt = setTimeout(() => {
           if (this.tab === 'tasks' && this.charts.hourly) this.drawHourlyChart();
           if (this.tab === 'analytics' && this.charts.analytics) this.drawAnalyticsChart();
-        }, 200);
+        }, 250);
       });
     },
     // ─── Шаблоны: методы ────────────────────
