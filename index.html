@@ -1,0 +1,1970 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MAX Automation</title>
+<link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/1/12/Логотип_MAX.svg" type="image/svg+xml"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: '#FAF8F5',
+        surface: '#FFFFFF',
+        subtle: '#F3F0EB',
+        'subtle-2': '#E8E4DB',
+        line: '#EBE8E3',
+        'line-2': '#D6D3CD',
+        ink: '#1A1A1A',
+        'ink-2': '#4A4A4A',
+        'ink-3': '#78716C',
+        'ink-4': '#A8A29E',
+        accent: '#D97757',
+        'accent-hi': '#C46345',
+        'accent-bg': '#FCF5F2',
+        views: '#7F9AB3',
+        'views-bg': '#F0F4F8',
+        'views-fg': '#38526B',
+        reactions: '#D9A594',
+        'reactions-bg': '#FCF5F2',
+        'reactions-fg': '#8E4A35',
+        ok: '#5F8E76',
+        'ok-bg': '#F0F7F4',
+        warn: '#C99B52',
+        'warn-bg': '#FDF9F0',
+        err: '#C25A53',
+        'err-bg': '#FCF1F1',
+      },
+      fontFamily: {
+        sans: ['Inter','system-ui','-apple-system','sans-serif'],
+        serif: ['"Playfair Display"','Georgia','serif'],
+        mono: ['"JetBrains Mono"','ui-monospace','monospace'],
+      },
+      boxShadow: {
+        card: '0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 4px 16px -4px rgba(0, 0, 0, 0.02)',
+        pop: '0 12px 32px -8px rgba(0, 0, 0, 0.12)',
+      }
+    }
+  }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// Fallback: если Chart.js не загрузился с CDN — рисуем простые графики на canvas
+window.Chart = window.Chart || (function(){
+  function CtxAdapter(ctx){ this.ctx = ctx; this.w = ctx.canvas.width; this.h = ctx.canvas.height; }
+  function SimpleChart(ctx, cfg){
+    this.cfg = cfg; this.type = cfg.type;
+    this.draw = function(){
+      var c = this.cfg, ctx = this.ctx;
+      var W = ctx.canvas.clientWidth || 600, H = ctx.canvas.clientHeight || 200;
+      ctx.canvas.width = W * 2; ctx.canvas.height = H * 2;
+      ctx.scale(2,2);
+      var pad = {l:36, r:12, t:12, b:22};
+      var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+      var labels = c.data.labels, datasets = c.data.datasets;
+      var maxV = 1;
+      datasets.forEach(function(d){ d.data.forEach(function(v){ if(v>maxV) maxV=v; }); });
+      maxV *= 1.15;
+      ctx.clearRect(0,0,W,H);
+      ctx.strokeStyle = '#F3F0EB'; ctx.lineWidth = 1;
+      for(var g=0; g<=4; g++){
+        var y = pad.t + ih - (ih*g/4);
+        ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W-pad.r, y); ctx.stroke();
+        ctx.fillStyle = '#A8A29E'; ctx.font = '10px Inter'; ctx.textAlign='right';
+        ctx.fillText(Math.round(maxV*g/4), pad.l-6, y+3);
+      }
+      var n = labels.length;
+      if(this.type === 'bar'){
+        var groupW = iw / n, barW = groupW * 0.32;
+        datasets.forEach(function(d, di){
+          ctx.fillStyle = d.backgroundColor;
+          d.data.forEach(function(v, i){
+            var x = pad.l + i*groupW + groupW/2 - (datasets.length*barW)/2 + di*barW;
+            var h = (v/maxV)*ih;
+            ctx.beginPath();
+            if(ctx.roundRect) ctx.roundRect(x, pad.t+ih-h, barW-1, h, 3);
+            else ctx.rect(x, pad.t+ih-h, barW-1, h);
+            ctx.fill();
+          });
+        });
+      } else {
+        datasets.forEach(function(d){
+          ctx.strokeStyle = d.borderColor; ctx.lineWidth = 2;
+          if(d.borderDash) ctx.setLineDash(d.borderDash); else ctx.setLineDash([]);
+          ctx.beginPath();
+          d.data.forEach(function(v, i){
+            var x = pad.l + (n===1?iw/2:i*iw/(n-1));
+            var y = pad.t + ih - (v/maxV)*ih;
+            i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+          });
+          ctx.stroke(); ctx.setLineDash([]);
+        });
+      }
+      ctx.fillStyle = '#A8A29E'; ctx.font = '10px Inter'; ctx.textAlign='center';
+      var step = Math.ceil(n/7);
+      labels.forEach(function(l, i){
+        if(i%step===0) ctx.fillText(l, pad.l + (n===1?iw/2:i*iw/(n-1)), H-6);
+      });
+    };
+    this.destroy = function(){};
+    this.resize = function(){ this.draw(); };
+    var self = this;
+    requestAnimationFrame(function(){ self.draw(); });
+    window.addEventListener('resize', function(){ self.draw(); });
+  }
+  return { defaults:{font:{family:'Inter',size:11},color:'#A8A29E'},
+    __last: null,
+    prototype: {},
+    register: function(){},
+    get: function(){ return this.__last; },
+    __set: function(c){ this.__last = c; }
+  };
+})();
+</script>
+
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<style>
+  body {
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    background: #FAF8F5; color: #1A1A1A;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+  }
+  ::selection { background: #F6D9D0; color: #1A1A1A; }
+  [x-cloak] { display: none !important; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #D6D3CD; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #A8A29E; }
+
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 32px; width: 32px; border-radius: 8px;
+    color: #A8A29E; transition: all .15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: #F3F0EB; color: #1A1A1A; }
+  .icon-btn.danger:hover { background: #FCF1F1; color: #C25A53; }
+
+  .field {
+    height: 36px; width: 100%; border-radius: 8px;
+    border: 1px solid #E8E4DB; background: #FFFFFF;
+    padding: 0 12px; font-size: 13px; color: #1A1A1A;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field::placeholder { color: #A8A29E; }
+  .field:hover { border-color: #D6D3CD; }
+  .field:focus { outline: none; border-color: #D97757; box-shadow: 0 0 0 3px rgba(217,119,87,.15); }
+  .field.error { border-color: #C25A53; box-shadow: 0 0 0 3px rgba(194,90,83,.1); }
+  .field-mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+  .field-select {
+    appearance: none; padding-right: 32px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A8A29E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-position: right 10px center; background-repeat: no-repeat; background-size: 14px;
+  }
+
+  .label { display: block; font-size: 12px; font-weight: 500; color: #4A4A4A; margin-bottom: 6px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 36px; padding: 0 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; white-space: nowrap;
+    transition: all .15s;
+  }
+  .btn-primary { background: #D97757; color: #FFFFFF; box-shadow: 0 1px 2px rgba(217,119,87,.2); }
+  .btn-primary:hover { background: #C46345; }
+  .btn-secondary { background: #FFFFFF; border: 1px solid #E8E4DB; color: #1A1A1A; }
+  .btn-secondary:hover { background: #FAF8F5; border-color: #D6D3CD; }
+  .btn-ghost { background: transparent; color: #78716C; }
+  .btn-ghost:hover { background: #F3F0EB; color: #1A1A1A; }
+  .btn-danger { background: #C25A53; color: #FFFFFF; }
+  .btn-danger:hover { background: #A64B45; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .dot { display: inline-block; height: 6px; width: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .seg { display: inline-flex; background: #F3F0EB; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg > button {
+    height: 28px; padding: 0 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; color: #78716C;
+    transition: all .15s;
+  }
+  .seg > button:hover { color: #1A1A1A; }
+  .seg > button.on { background: #FFFFFF; color: #1A1A1A; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+
+  .toggle {
+    position: relative; height: 22px; width: 38px; border-radius: 999px;
+    transition: background .2s; flex-shrink: 0; cursor: pointer;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    height: 18px; width: 18px; border-radius: 50%; background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15); transition: left .2s;
+  }
+  .toggle.on { background: #D97757; }
+  .toggle.on::after { left: 18px; }
+  .toggle.off { background: #E8E4DB; }
+
+  .card { background: #FFFFFF; border: 1px solid #EBE8E3; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #F3F0EB; gap: 16px; flex-wrap: wrap; }
+  .card-title { font-size: 16px; font-weight: 500; color: #1A1A1A; }
+  .card-body { padding: 24px; }
+
+  .stat-label { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #78716C; }
+  .stat-value { font-size: 24px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; color: #1A1A1A; }
+  .stat-sub { font-size: 12px; color: #A8A29E; margin-top: 4px; }
+
+  .emoji-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 64px; border-radius: 12px; border: 1px solid #E8E4DB;
+    background: #FFFFFF; cursor: pointer; transition: all .15s;
+  }
+  .emoji-tile:hover { border-color: #D6D3CD; background: #FAF8F5; }
+  .emoji-tile.on { border-color: #D97757; background: #FCF5F2; box-shadow: inset 0 0 0 1px #D97757; }
+  .emoji-tile .emoji { font-size: 22px; line-height: 1; }
+  .emoji-tile .name { font-size: 10px; color: #78716C; margin-top: 4px; }
+
+  .row-check { appearance: none; width: 16px; height: 16px; border: 1px solid #D6D3CD; border-radius: 4px; cursor: pointer; flex-shrink: 0; transition: all .1s; }
+  .row-check:checked { background: #D97757; border-color: #D97757; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 10'/%3E%3C/svg%3E"); background-size: 10px; background-position: center; background-repeat: no-repeat; }
+  .row-check:focus { outline: none; box-shadow: 0 0 0 3px rgba(217,119,87,.2); }
+
+  .post-row { transition: background .15s; }
+  .post-row:hover { background: #FAF8F5; }
+  .post-row:hover .row-actions { opacity: 1; }
+  .row-actions { opacity: 0; transition: opacity .15s; }
+
+  .menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 8px 12px; font-size: 13px; color: #1A1A1A; border-radius: 6px;
+    transition: background .1s;
+  }
+  .menu-item:hover { background: #F3F0EB; }
+  .menu-item.danger { color: #C25A53; }
+  .menu-item.danger:hover { background: #FCF1F1; }
+
+  .drawer-section { padding: 24px; border-bottom: 1px solid #F3F0EB; }
+  .drawer-section:last-of-type { border-bottom: none; }
+
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  *:focus-visible { outline: none; }
+  button:focus-visible, a:focus-visible, [role="switch"]:focus-visible { box-shadow: 0 0 0 3px rgba(217,119,87,.25); }
+  .field:focus-visible { outline: none; }
+
+  /* Фикс для Chart.js */
+  .chart-wrapper { position: relative; width: 100%; }
+</style>
+</head>
+
+<body x-data="app()" x-init="init()"
+      @keydown.escape.window="drawerOpen=false; confirm.open=false; addChannelOpen=false; postMenuOpen=null;">
+
+<!-- ═══ HEADER ═══ -->
+<header class="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-md">
+  <div class="mx-auto flex h-16 max-w-[1200px] items-center gap-8 px-6">
+
+    <!-- Логотип и Название -->
+    <a @click.prevent="tab='tasks'" href="#" class="flex shrink-0 items-center gap-2.5 group">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Логотип_MAX.svg"
+           alt="MAX" class="h-6 w-6 rounded-[6px] transition-transform group-hover:scale-105" loading="lazy" referrerpolicy="no-referrer"/>
+      <span class="font-serif text-[20px] font-medium tracking-tight text-ink whitespace-nowrap">MAX Automation</span>
+    </a>
+
+    <!-- Навигация -->
+    <nav class="flex items-center gap-1">
+      <button @click="tab='tasks'" :class="tab==='tasks' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+        Задания
+        <span x-show="tab==='tasks'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+      </button>
+      <button @click="tab='analytics'" :class="tab==='analytics' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+        Аналитика
+        <span x-show="tab==='analytics'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+      </button>
+      <button @click="tab='channels'" :class="tab==='channels' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+        Каналы
+        <span x-show="tab==='channels'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+      </button>
+      <button @click="tab='templates'" :class="tab==='templates' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+        Шаблоны
+        <span x-show="tab==='templates'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+      </button>
+      <button @click="tab='settings'" :class="tab==='settings' ? 'text-ink' : 'text-ink-3 hover:text-ink'" class="relative h-16 px-4 text-[13px] font-medium transition-colors">
+        Настройки
+        <span x-show="tab==='settings'" class="absolute inset-x-4 bottom-0 h-[2px] bg-accent rounded-t-full"></span>
+      </button>
+    </nav>
+
+    <!-- Действия -->
+    <div class="ml-auto flex items-center gap-3">
+      <button class="icon-btn h-8 w-8" @click="refresh()" :title="'Обновлено ' + syncedAt">
+        <svg class="h-4 w-4" :class="refreshing && 'animate-spin'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      
+      <!-- Кнопка Баланса (Исправлена верстка) -->
+      <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="flex h-8 shrink-0 items-center gap-2 rounded-lg bg-surface border border-line px-3 text-[12px] transition-colors hover:border-line-2 hover:bg-subtle whitespace-nowrap" title="Пополнить на SMMPrime">
+        <span class="text-ink-3">Баланс</span>
+        <span class="font-medium text-ink tabular-nums">₽ <span x-text="fmtMoney(balance)"></span></span>
+      </a>
+      
+      <button class="btn btn-primary h-8 px-4 text-[12px] rounded-lg shadow-sm" @click="openDrawer()">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Новое
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1200px] px-6 py-8">
+
+  <!-- ═══ TAB: TASKS ═══ -->
+  <div x-show="tab==='tasks'" class="space-y-6">
+
+    <!-- Заголовок -->
+    <div class="flex flex-col gap-1.5">
+      <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Задания</h1>
+      <p class="text-[14px] text-ink-3">Управление активностью публикаций в реальном времени.</p>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3 text-[13px]">
+        <span class="flex items-center gap-2 text-ink-2"><span class="dot bg-ok"></span> <span x-text="runningCount"></span> в работе</span>
+        <span class="text-line-2">|</span>
+        <span class="flex items-center gap-2 text-ink-2"><span class="dot bg-warn"></span> <span x-text="pausedCount"></span> на паузе</span>
+        <span class="text-line-2">|</span>
+        <button class="flex items-center gap-2 text-ink-3 hover:text-ink transition-colors" @click="tab='settings'">
+          Автоподхват <span :class="settings.autoPickup ? 'text-ok' : 'text-ink-4'" class="font-medium" x-text="settings.autoPickup ? 'вкл' : 'выкл'"></span>
+        </button>
+      </div>
+      <div class="seg">
+        <button :class="filter==='all' && 'on'" @click="filter='all'">Все <span class="text-ink-4 ml-1" x-text="posts.length"></span></button>
+        <button :class="filter==='running' && 'on'" @click="filter='running'">В работе</button>
+        <button :class="filter==='paused' && 'on'" @click="filter='paused'">Пауза</button>
+        <button :class="filter==='completed' && 'on'" @click="filter='completed'">Готово</button>
+      </div>
+    </div>
+
+    <!-- Поиск и фильтры -->
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" x-model="query" class="field h-9 w-72 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск по URL или каналу" autocomplete="off"/>
+      </div>
+
+      <select x-model="channelFilter" class="field field-select h-9 w-48 text-[12px] rounded-lg">
+        <option value="">Все каналы</option>
+        <template x-for="ch in channels" :key="ch.id">
+          <option :value="ch.handle" x-text="'max.ru/' + ch.handle"></option>
+        </template>
+      </select>
+
+      <select x-model="sortValue" class="field field-select h-9 w-48 text-[12px] rounded-lg">
+        <option value="date-desc">Новые сверху</option>
+        <option value="date-asc">Старые сверху</option>
+        <option value="progress-desc">Прогресс ↓</option>
+        <option value="progress-asc">Прогресс ↑</option>
+      </select>
+
+      <button class="btn btn-secondary h-9 px-3 text-[12px] rounded-lg" @click="exportTasksCSV()">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Экспорт
+      </button>
+    </div>
+
+    <!-- Метрики -->
+    <section class="card">
+      <div class="grid grid-cols-2 divide-x divide-line md:grid-cols-4">
+        <div class="p-5">
+          <div class="flex items-center gap-2">
+            <span class="dot bg-views"></span>
+            <p class="stat-label">Доставлено сегодня</p>
+          </div>
+          <div class="mt-3 flex items-end justify-between">
+            <div>
+              <p class="stat-value tabular-nums" x-text="intFmt(todayViews)"></p>
+              <p class="stat-sub"><span class="tabular-nums text-reactions-fg" x-text="intFmt(todayReactions)"></span> реакций</p>
+            </div>
+            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+              <path d="M0 20 L8 16 L16 18 L24 12 L32 14 L40 8 L48 10 L56 4 L64 6" stroke="#7F9AB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2">
+            <span class="dot bg-ok"></span>
+            <p class="stat-label">Активных</p>
+          </div>
+          <div class="mt-3 flex items-end justify-between">
+            <div>
+              <p class="stat-value tabular-nums" x-text="runningCount"></p>
+              <p class="stat-sub">из <span class="tabular-nums" x-text="posts.length"></span> всего</p>
+            </div>
+            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+              <path d="M0 12 L8 12 L16 14 L24 10 L32 12 L40 8 L48 10 L56 8 L64 6" stroke="#5F8E76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2">
+            <span class="dot bg-ink-3"></span>
+            <p class="stat-label">Пик нагрузки</p>
+          </div>
+          <div class="mt-3 flex items-end justify-between">
+            <div>
+              <p class="stat-value tabular-nums"><span x-text="intFmt(peakRate)"></span><span class="text-[14px] text-ink-4 font-normal ml-1">/ч</span></p>
+              <p class="stat-sub">в <span class="tabular-nums" x-text="peakHour + ':00'"></span></p>
+            </div>
+            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+              <path d="M0 22 L8 18 L16 12 L24 8 L32 14 L40 16 L48 10 L56 12 L64 4" stroke="#78716C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2">
+            <span class="dot bg-ink-3"></span>
+            <p class="stat-label">Расход сегодня</p>
+          </div>
+          <div class="mt-3 flex items-end justify-between">
+            <div>
+              <p class="stat-value tabular-nums">₽ <span x-text="fmtMoney(todayCost)"></span></p>
+              <p class="stat-sub">≈ <span class="tabular-nums" x-text="intFmt(todayCost / 0.05)"></span> просм</p>
+            </div>
+            <svg class="mb-1.5 h-8 w-20 opacity-70" viewBox="0 0 64 24" fill="none" preserveAspectRatio="none">
+              <path d="M0 8 L8 10 L16 12 L24 10 L32 16 L40 14 L48 18 L56 16 L64 20" stroke="#C99B52" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- График 1 (Исправлена инициализация) -->
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Доставка · 24 часа</h2>
+        <div class="flex items-center gap-4 text-[12px]">
+          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-views"></span>Просмотры</span>
+          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-reactions"></span>Реакции</span>
+        </div>
+      </div>
+      <div class="p-6 pt-8">
+        <!-- Контейнер с жесткой высотой -->
+        <div class="chart-wrapper h-[180px]">
+          <canvas x-ref="hourlyCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Пустое состояние -->
+    <div x-show="sortedPosts.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-24 text-center">
+      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-subtle">
+        <svg class="h-7 w-7 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
+      </div>
+      <p class="mt-4 text-[16px] font-medium text-ink" x-text="posts.length === 0 ? 'Заданий пока нет' : 'Ничего не найдено'"></p>
+      <p class="mt-1 text-[13px] text-ink-3" x-text="posts.length === 0 ? 'Создайте первое задание, чтобы начать накрутку' : 'Попробуйте изменить поиск или фильтры'"></p>
+      <button x-show="posts.length === 0" class="btn btn-primary mt-6 px-6" @click="openDrawer()">
+        Создать задание
+      </button>
+    </div>
+
+    <!-- Список заданий -->
+    <section x-show="sortedPosts.length > 0" class="rounded-2xl border border-line bg-surface shadow-sm overflow-hidden">
+      <div class="divide-y divide-line">
+        <template x-for="post in sortedPosts" :key="post.id">
+          <div class="post-row">
+            <div class="flex items-start gap-4 px-6 py-5">
+              <input type="checkbox" class="row-check mt-1" :checked="selected.includes(post.id)" @change="toggleSelect(post.id)"/>
+
+              <div class="min-w-0 flex-1">
+                <!-- Row 1 -->
+                <div class="flex items-center gap-3">
+                  <span class="dot shrink-0" :class="statusMeta(post.status).dot"></span>
+                  <a class="mono flex-1 truncate text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://' + post.url" target="_blank" rel="noopener" x-text="post.url"></a>
+                  <span class="text-[12px] tabular-nums text-ink-3 ml-2" x-text="pct(post) + '%'"></span>
+                  <div class="row-actions relative">
+                    <button class="icon-btn h-7 w-7" @click.stop="togglePostMenu(post.id)">
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>
+                    </button>
+                    <div x-show="postMenuOpen === post.id" x-cloak @click.outside="postMenuOpen=null"
+                         class="absolute right-0 top-full z-30 mt-1 w-[180px] rounded-xl border border-line bg-surface p-1.5 shadow-pop">
+                      <button class="menu-item" @click="editPost(post); postMenuOpen=null">Редактировать</button>
+                      <button class="menu-item" @click="copyUrl(post.url); postMenuOpen=null">Копировать URL</button>
+                      <button class="menu-item" @click="duplicatePost(post); postMenuOpen=null">Дублировать</button>
+                      <button x-show="post.status!=='completed'" class="menu-item" @click="togglePause(post); postMenuOpen=null">
+                        <span x-text="post.status==='running' ? 'Приостановить' : 'Продолжить'"></span>
+                      </button>
+                      <div class="my-1 h-px bg-line"></div>
+                      <button class="menu-item danger" @click="askRemovePost(post); postMenuOpen=null">Удалить</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-[20px] text-[12px] text-ink-4">
+                  <span class="text-ink-3 font-medium" x-text="post.channel"></span>
+                  <span class="text-line-2">·</span>
+                  <span class="flex items-center gap-1.5">
+                    <span class="dot bg-views"></span>
+                    <span class="tabular-nums"><span class="text-views-fg font-medium" x-text="intFmt(post.delivered.views)"></span><span class="text-ink-4">/</span><span x-text="intFmt(post.total.views)"></span></span>
+                  </span>
+                  <span x-show="post.total.reactions > 0" class="flex items-center gap-1.5">
+                    <span class="dot bg-reactions"></span>
+                    <span class="tabular-nums"><span class="text-reactions-fg font-medium" x-text="intFmt(post.delivered.reactions)"></span><span class="text-ink-4">/</span><span x-text="intFmt(post.total.reactions)"></span></span>
+                    <span x-show="post.reactionKey && post.reactionKey !== 'mix'" x-text="reactionEmoji(post.reactionKey)" class="text-[14px] ml-0.5"></span>
+                    <span x-show="post.reactionKey === 'mix'" class="text-ink-3 ml-0.5">микс</span>
+                  </span>
+                  <span class="text-line-2">·</span>
+                  <span class="tabular-nums" x-text="Math.floor(post.currentHour) + '/' + post.totalHours + ' ч'"></span>
+                  <span x-show="post.status==='running'" class="tabular-nums text-ink-4">осталось <span x-text="formatEta(post.totalHours - post.currentHour)"></span></span>
+                </div>
+
+                <!-- Row 3 -->
+                <div class="mt-3 flex gap-2 pl-[20px]">
+                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 6px;">
+                    <div class="h-full rounded-full bg-views transition-all duration-500" :style="{width: pctViews(post) + '%'}"></div>
+                  </div>
+                  <div class="flex-1 overflow-hidden rounded-full bg-subtle" style="height: 6px;" x-show="post.total.reactions > 0">
+                    <div class="h-full rounded-full bg-reactions transition-all duration-500" :style="{width: pctReactions(post) + '%'}"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══ TAB: ANALYTICS ═══ -->
+  <div x-show="tab==='analytics'" x-cloak class="space-y-6">
+
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div class="flex flex-col gap-1.5">
+        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Аналитика</h1>
+        <p class="text-[14px] text-ink-3">Эффективность доставки и вовлечённость аудитории.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="seg">
+          <button :class="analyticsPeriod===7 && 'on'" @click="analyticsPeriod=7">7 дней</button>
+          <button :class="analyticsPeriod===14 && 'on'" @click="analyticsPeriod=14">14 дней</button>
+          <button :class="analyticsPeriod===30 && 'on'" @click="analyticsPeriod=30">30 дней</button>
+        </div>
+        <button class="btn btn-secondary h-9 px-3 text-[12px] rounded-lg" @click="exportAnalyticsCSV()">
+          Экспорт
+        </button>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="grid grid-cols-2 divide-x divide-line md:grid-cols-4">
+        <div class="p-5">
+          <p class="stat-label">Всего доставлено</p>
+          <p class="mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views)"></p>
+          <p class="stat-sub"><span class="tabular-nums text-reactions-fg" x-text="intFmt(analyticsTotals.reactions)"></span> реакций</p>
+        </div>
+        <div class="p-5">
+          <p class="stat-label">Потрачено</p>
+          <p class="mt-3 stat-value tabular-nums">₽ <span x-text="fmtMoney(analyticsTotals.spent)"></span></p>
+          <p class="stat-sub">за период</p>
+        </div>
+        <div class="p-5">
+          <p class="stat-label">Средний ER</p>
+          <p class="mt-3 stat-value tabular-nums" x-text="analyticsTotals.avgER + '%'"></p>
+          <p class="stat-sub">вовлечённость</p>
+        </div>
+        <div class="p-5">
+          <p class="stat-label">В среднем в день</p>
+          <p class="mt-3 stat-value tabular-nums" x-text="intFmt(analyticsTotals.views / analyticsPeriod)"></p>
+          <p class="stat-sub">≈ ₽ <span x-text="fmtMoney(analyticsTotals.spent / analyticsPeriod)"></span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Динамика по дням</h2>
+        <div class="flex items-center gap-4 text-[12px]">
+          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-views"></span>Просмотры</span>
+          <span class="flex items-center gap-2 text-ink-3"><span class="h-[3px] w-4 rounded-full bg-reactions"></span>Реакции</span>
+        </div>
+      </div>
+      <div class="p-6 pt-8">
+        <div class="chart-wrapper h-[280px]">
+          <canvas x-ref="analyticsCanvas"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <section class="card">
+        <div class="card-head"><h2 class="card-title">Топ заданий</h2></div>
+        <div class="divide-y divide-line">
+          <template x-for="(post, i) in topPosts" :key="post.id">
+            <div class="flex items-center gap-4 px-6 py-4">
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-subtle text-[12px] font-medium tabular-nums text-ink-3" x-text="i + 1"></span>
+              <div class="min-w-0 flex-1">
+                <p class="mono truncate text-[13px] text-ink" x-text="post.url"></p>
+                <p class="mt-1 text-[12px] text-ink-4">
+                  <span class="tabular-nums text-views-fg" x-text="intFmt(post.total.views)"></span> просм
+                  <span x-show="post.total.reactions > 0"> · <span class="tabular-nums text-reactions-fg" x-text="intFmt(post.total.reactions)"></span> реакц</span>
+                </p>
+              </div>
+              <span class="text-[12px] tabular-nums text-ink-3" x-text="pct(post) + '%'"></span>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2 class="card-title">По реакциям</h2></div>
+        <div class="divide-y divide-line">
+          <template x-for="r in reactionStats" :key="r.key">
+            <div class="flex items-center gap-4 px-6 py-4">
+              <span class="text-[20px] leading-none w-8 text-center" x-text="r.emoji"></span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between mb-1.5">
+                  <p class="text-[13px] font-medium text-ink" x-text="r.name"></p>
+                  <p class="text-[12px] font-medium tabular-nums text-reactions-fg" x-text="intFmt(r.count)"></p>
+                </div>
+                <div class="h-[6px] overflow-hidden rounded-full bg-subtle">
+                  <div class="h-full rounded-full bg-reactions" :style="{width: r.pct + '%'}"></div>
+                </div>
+              </div>
+              <div class="text-right w-10">
+                <p class="text-[12px] tabular-nums text-ink-3" x-text="r.pct + '%'"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: CHANNELS ═══ -->
+  <div x-show="tab==='channels'" x-cloak class="space-y-6">
+
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div class="flex flex-col gap-1.5">
+        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Каналы</h1>
+        <p class="text-[14px] text-ink-3">Белый список автодоставки.</p>
+      </div>
+      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg" @click="addChannelOpen=true">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Добавить
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-6 py-5 shadow-sm">
+      <div>
+        <p class="text-[15px] font-medium text-ink">Автоподхват новых публикаций</p>
+        <p class="mt-1 text-[13px] text-ink-3">
+          Проверка каждые <span x-text="settings.pickupInterval"></span> мин · последняя — <span x-text="lastPickup"></span>
+        </p>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-[13px] text-ink-3">
+          <span>Интервал</span>
+          <input type="number" x-model.number="settings.pickupInterval" class="field field-mono h-8 w-16 text-right text-[12px] rounded-md"/>
+          <span>мин</span>
+        </div>
+        <button class="toggle" :class="settings.autoPickup ? 'on' : 'off'" role="switch" :aria-checked="settings.autoPickup" @click="toggleSetting('autoPickup')"></button>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" x-model="channelQuery" class="field h-9 w-64 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск канала" autocomplete="off"/>
+      </div>
+      <div class="ml-auto text-[12px] text-ink-4">
+        <span class="tabular-nums text-ink-2" x-text="channelsFiltered.length"></span> из <span class="tabular-nums" x-text="channels.length"></span>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="divide-y divide-line">
+        <template x-for="ch in channelsFiltered" :key="ch.id">
+          <div class="flex items-center gap-5 px-6 py-4">
+            <div class="min-w-0 flex-1">
+              <a class="mono text-[14px] font-medium text-ink hover:text-accent transition-colors" :href="'https://max.ru/' + ch.handle" target="_blank" rel="noopener" x-text="'max.ru/' + ch.handle"></a>
+              <p class="mt-1.5 flex items-center gap-2.5 text-[12px] text-ink-4">
+                <span class="tabular-nums"><span class="text-ink-2" x-text="intFmt(ch.subs)"></span> подп</span>
+                <span>·</span>
+                <span>ER <span class="text-ink-2" x-text="ch.err + '%'"></span></span>
+                <span>·</span>
+                <span class="tabular-nums"><span class="text-views-fg" x-text="intFmt(ch.delivered)"></span> доставлено</span>
+              </p>
+            </div>
+            <button class="toggle" :class="ch.status==='active' ? 'on' : 'off'" role="switch" :aria-checked="ch.status==='active'" @click="toggleChannel(ch)"></button>
+            <button class="icon-btn danger h-8 w-8" @click="removeChannel(ch)" title="Удалить">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+        </template>
+      </div>
+    </section>
+  </div>
+
+
+  <!-- ═══ TAB: TEMPLATES ═══ -->
+  <div x-show="tab==='templates'" x-cloak class="space-y-6">
+
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div class="flex flex-col gap-1.5">
+        <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Шаблоны</h1>
+        <p class="text-[14px] text-ink-3">Сохранённые сценарии распределения активности.</p>
+      </div>
+      <button class="btn btn-primary h-9 px-4 text-[12px] rounded-lg" @click="openTemplateDrawer()">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Создать шаблон
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="relative">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" x-model="templateQuery" class="field h-9 w-64 pl-9 pr-8 text-[12px] rounded-lg" placeholder="Поиск шаблона" autocomplete="off"/>
+      </div>
+      <div class="ml-auto text-[12px] text-ink-4">
+        <span class="tabular-nums text-ink-2" x-text="templatesFiltered.length"></span> из <span class="tabular-nums" x-text="templates.length"></span>
+      </div>
+    </div>
+
+    <div x-show="templatesFiltered.length === 0" x-cloak class="flex flex-col items-center justify-center rounded-2xl border border-line bg-surface py-24 text-center">
+      <div class="flex h-16 w-16 items-center justify-center rounded-full bg-subtle">
+        <svg class="h-7 w-7 text-ink-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </div>
+      <p class="mt-4 text-[16px] font-medium text-ink">Шаблонов пока нет</p>
+      <p class="mt-1 text-[13px] text-ink-3">Создайте шаблон, чтобы быстро запускать типовые сценарии</p>
+      <button class="btn btn-primary mt-6 px-6" @click="openTemplateDrawer()">Создать шаблон</button>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <template x-for="tpl in templatesFiltered" :key="tpl.id">
+        <div class="card p-5 flex flex-col gap-4 hover:shadow-pop transition-shadow">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[15px] font-medium text-ink truncate" x-text="tpl.name"></p>
+              <p class="mt-1 text-[12px] text-ink-3" x-text="tpl.description || 'Без описания'"></p>
+            </div>
+            <span class="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium"
+                  :class="tpl.mode === 'both' ? 'bg-accent-bg text-accent-hi' : tpl.mode === 'views' ? 'bg-views-bg text-views-fg' : 'bg-reactions-bg text-reactions-fg'"
+                  x-text="tpl.mode === 'both' ? 'Просм + реакц' : tpl.mode === 'views' ? 'Просмотры' : 'Реакции'"></span>
+          </div>
+
+          <div class="flex h-14 items-end gap-[2px] rounded-lg bg-subtle px-2 pb-1.5 pt-2">
+            <template x-for="(h, i) in tplPreview(tpl)" :key="i">
+              <div class="flex-1 flex flex-col justify-end gap-[1px]" style="height: 100%;">
+                <div class="w-full rounded-t-[1px] bg-reactions" :style="{height: (tpl.mode !== 'views' ? Math.max(3, h.reactions / tplMax(tpl) * 100) : 0) + '%'}"></div>
+                <div class="w-full rounded-t-[1px] bg-views" :style="{height: (tpl.mode !== 'reactions' ? Math.max(3, h.views / tplMax(tpl) * 100) : 0) + '%'}"></div>
+              </div>
+            </template>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="rounded-lg bg-subtle py-2">
+              <p class="text-[11px] text-ink-4">Дней</p>
+              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="tpl.duration"></p>
+            </div>
+            <div class="rounded-lg bg-subtle py-2">
+              <p class="text-[11px] text-ink-4">Этапов</p>
+              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="tpl.stages.length"></p>
+            </div>
+            <div class="rounded-lg bg-subtle py-2">
+              <p class="text-[11px] text-ink-4">Просм/день</p>
+              <p class="text-[14px] font-medium tabular-nums text-ink" x-text="intFmt(tplDayViews(tpl))"></p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <button class="btn btn-primary h-8 flex-1 text-[12px] rounded-lg" @click="applyTemplate(tpl)">Применить</button>
+            <button class="btn btn-secondary h-8 px-3 text-[12px] rounded-lg" @click="editTemplate(tpl)">Изм.</button>
+            <button class="icon-btn danger h-8 w-8" @click="askRemoveTemplate(tpl)" title="Удалить">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: SETTINGS ═══ -->
+  <div x-show="tab==='settings'" x-cloak class="space-y-6">
+    <div class="flex flex-col gap-1.5">
+      <h1 class="font-serif text-[32px] font-medium leading-tight text-ink">Настройки</h1>
+      <p class="text-[14px] text-ink-3">SMM API, автоподхват, уведомления.</p>
+    </div>
+
+    <div class="max-w-[700px] space-y-6">
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title">SMM API</h2>
+          <span class="flex items-center gap-2 text-[12px] font-medium text-ok"><span class="dot bg-ok"></span>Подключено</span>
+        </div>
+        <div class="card-body space-y-5">
+          <div>
+            <label class="label" for="apiKey">Ключ</label>
+            <div class="flex items-center gap-2">
+              <input id="apiKey" :type="showKey ? 'text' : 'password'" x-model="settings.apiKey" class="field field-mono text-[13px]"/>
+              <button class="btn btn-secondary h-9 px-3" @click="showKey=!showKey">
+                <span x-text="showKey ? 'Скрыть' : 'Показать'" class="text-[12px]"></span>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="label" for="endpoint">Endpoint</label>
+            <input id="endpoint" x-model="settings.endpoint" class="field field-mono text-[12px]"/>
+          </div>
+          <p class="text-[12px] text-ink-4 pt-2">Проверено <span x-text="syncedAt"></span></p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title">Баланс SMM API</h2>
+          <a :href="smmBalanceUrl" target="_blank" rel="noopener" class="text-[12px] font-medium text-accent hover:underline inline-flex items-center gap-1">
+            Пополнить на SMMPrime
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+        <div class="card-body">
+          <div class="flex items-baseline justify-between">
+            <p class="text-[32px] font-medium tabular-nums tracking-tight text-ink">₽ <span x-text="fmtMoney(balance)"></span></p>
+            <p class="text-[12px] text-ink-4">≈ <span class="tabular-nums" x-text="intFmt(balance * 20)"></span> просм · <span class="tabular-nums" x-text="intFmt(balance / 0.15)"></span> реакц</p>
+          </div>
+          <p class="mt-4 text-[12px] leading-relaxed text-ink-4">
+            Баланс синхронизируется с личным кабинетом SMMPrime автоматически. Пополнение доступно на стороне провайдера.
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══ BULK ACTION BAR ═══ -->
+<div x-show="selected.length > 0" x-cloak x-transition.opacity.duration.150ms
+     class="fixed left-1/2 -translate-x-1/2 bottom-6 z-40 flex items-center gap-4 rounded-xl border border-line bg-surface px-5 py-3 shadow-pop">
+  <span class="text-[13px] text-ink-2">Выбрано: <span class="font-medium text-ink tabular-nums" x-text="selected.length"></span></span>
+  <span class="h-5 w-px bg-line"></span>
+  <button class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('pause')">Приостановить</button>
+  <button class="text-[13px] font-medium text-ink-2 hover:text-ink transition-colors" @click="bulkAction('resume')">Продолжить</button>
+  <button class="text-[13px] font-medium text-err hover:text-err/80 transition-colors" @click="bulkAction('delete')">Удалить</button>
+  <span class="h-5 w-px bg-line"></span>
+  <button class="text-[13px] text-ink-3 hover:text-ink transition-colors" @click="selected=[]">Сбросить</button>
+</div>
+
+<!-- ═══ DRAWER ═══ -->
+<div x-show="drawerOpen" x-cloak class="fixed inset-0 z-50">
+  <div x-show="drawerOpen" x-transition.opacity.duration.200ms class="absolute inset-0 bg-ink/20 backdrop-blur-sm" @click="closeDrawer()"></div>
+
+  <div x-show="drawerOpen"
+       x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+       class="absolute right-0 top-0 bottom-0 flex w-full max-w-[500px] flex-col border-l border-line bg-surface shadow-2xl rounded-l-2xl overflow-hidden">
+
+    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
+      <h2 class="font-serif text-[20px] font-medium text-ink" x-text="editingPost ? 'Редактировать задание' : 'Новое задание'"></h2>
+      <button class="icon-btn" @click="closeDrawer()">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+      <div x-show="formError" x-cloak class="mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
+        <p class="text-[12px] font-medium text-err" x-text="formError"></p>
+      </div>
+
+      <section class="drawer-section">
+        <label class="label" for="url">Ссылка на пост</label>
+        <input id="url" x-ref="urlInput" type="text" class="field field-mono text-[13px]" :class="formError && 'error'" x-model="form.url" placeholder="max.ru/channel/p-1234" spellcheck="false"/>
+        <p x-show="form.url && detectedChannel" x-cloak class="mt-2.5 flex items-center gap-2 text-[12px] text-ok">
+          <span class="dot bg-ok"></span>
+          <span x-text="detectedChannel + ' · в белом списке'"></span>
+        </p>
+      </section>
+
+      <section class="drawer-section">
+        <div class="flex items-center justify-between mb-3">
+          <label class="label mb-0">Длительность</label>
+          <div class="relative" x-data="{open:false}">
+            <button type="button" @click="open=!open" class="flex items-center gap-1.5 text-[12px] font-medium text-accent hover:text-accent-hi transition-colors">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Из шаблона
+              <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div x-show="open" x-cloak @click.outside="open=false"
+                 class="absolute right-0 top-full z-30 mt-1 w-[220px] rounded-xl border border-line bg-surface p-1.5 shadow-pop">
+              <template x-for="tpl in templates" :key="tpl.id">
+                <button type="button" class="menu-item" @click="applyTemplateToForm(tpl); open=false" x-text="tpl.name"></button>
+              </template>
+              <div x-show="templates.length===0" class="px-3 py-2 text-[12px] text-ink-4">Нет шаблонов</div>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2.5">
+          <template x-for="d in [7, 14, 30]" :key="d">
+            <button type="button" @click="form.duration=d" class="h-10 rounded-xl border text-[13px] font-medium tabular-nums transition-all"
+                    :class="form.duration===d ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
+                    x-text="d + ' дней'"></button>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <label class="label">Что доставлять</label>
+        <div class="grid grid-cols-3 gap-2.5">
+          <template x-for="m in [{k:'views',n:'Просмотры'},{k:'reactions',n:'Реакции'},{k:'both',n:'Оба'}]" :key="m.k">
+            <button type="button" @click="form.mode=m.k" class="h-10 rounded-xl border text-[13px] font-medium transition-all"
+                    :class="form.mode===m.k ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
+                    x-text="m.n"></button>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section" x-show="form.mode !== 'views'" x-cloak>
+        <div class="flex items-center justify-between">
+          <label class="label mb-0">Тип реакции</label>
+          <button type="button" @click="toggleMix()" class="text-[12px] font-medium transition-colors"
+                  :class="form.mixMode ? 'text-accent' : 'text-ink-3 hover:text-ink'">
+            <span x-show="!form.mixMode">Включить микс</span>
+            <span x-show="form.mixMode" x-cloak>✓ Микс: <span x-text="form.reactions.length"></span></span>
+          </button>
+        </div>
+        <div class="mt-3 grid grid-cols-4 gap-2.5">
+          <template x-for="r in reactions" :key="r.key">
+            <button type="button" @click="selectReaction(r.key)" class="emoji-tile" :class="isReactionSelected(r.key) && 'on'">
+              <span class="emoji" x-text="r.emoji"></span>
+              <span class="name" x-text="r.name"></span>
+            </button>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="flex items-baseline justify-between">
+          <label class="label mb-0">Распределение</label>
+          <span class="text-[11px] text-ink-4">24 часа</span>
+        </div>
+        <div class="mt-3 flex h-20 items-end gap-[3px] rounded-xl bg-subtle px-3 pb-2 pt-3">
+          <template x-for="(h, i) in expandedPlan" :key="i">
+            <div class="flex-1 flex flex-col justify-end gap-[1px]" style="height: 100%;">
+              <div class="w-full rounded-t-sm bg-reactions transition-all" :style="{height: (form.mode !== 'views' ? barHeightOf(h.reactions, maxVolume) : 0) + '%'}"></div>
+              <div class="w-full rounded-t-sm bg-views transition-all" :style="{height: (form.mode !== 'reactions' ? barHeightOf(h.views, maxVolume) : 0) + '%'}"></div>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="flex items-baseline justify-between">
+          <label class="label mb-0">Этапы</label>
+          <span class="text-[11px] text-ink-4" x-text="form.granularity === 'hour' ? 'час от старта · шт/мин' : 'время · шт/мин'"></span>
+        </div>
+        <div class="mt-3 space-y-2">
+          <template x-for="(stage, i) in form.stages" :key="i">
+            <div class="flex items-center gap-2">
+              <input type="number" min="0" max="23" class="field field-mono h-9 w-14 text-center" x-model.number="stage.hour"/>
+              <span class="text-[11px] text-ink-4">ч</span>
+              <template x-if="form.mode !== 'reactions'">
+                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.views" placeholder="просм/мин"/>
+              </template>
+              <template x-if="form.mode === 'both'">
+                <span class="text-[11px] text-ink-4">+</span>
+              </template>
+              <template x-if="form.mode !== 'views'">
+                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.reactions" placeholder="реакц/мин"/>
+              </template>
+              <button type="button" class="icon-btn danger h-9 w-9" :disabled="form.stages.length===1" :class="form.stages.length===1 && 'opacity-30 pointer-events-none'" @click="removeStage(i)">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
+        <button type="button" @click="addStage()" class="mt-2.5 flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 text-[12px] font-medium text-ink-3 hover:border-ink-3 hover:bg-subtle">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Добавить этап
+        </button>
+      </section>
+
+      <section class="drawer-section bg-subtle/50">
+        <div class="space-y-2 text-[13px]">
+          <div class="flex items-center justify-between">
+            <span class="text-ink-3">Объём за весь срок</span>
+            <span class="tabular-nums font-medium text-ink">
+              <span class="text-views-fg" x-text="intFmt(totals.views) + ' просм'"></span>
+              <template x-if="totals.reactions > 0"><span> · <span class="text-reactions-fg" x-text="intFmt(totals.reactions) + ' реакц'"></span></span></template>
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-ink-3">Стоимость</span>
+            <span class="tabular-nums font-medium text-ink">₽ <span x-text="fmtMoney(cost)"></span></span>
+          </div>
+          <div class="flex items-center justify-between border-t border-line pt-2 mt-2">
+            <span class="text-ink-3">Остаток на SMM API</span>
+            <span class="tabular-nums font-semibold" :class="remaining < 0 ? 'text-err' : 'text-ink'" x-text="'₽ ' + fmtMoney(remaining)"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-6 bg-surface">
+      <button class="btn btn-ghost" @click="closeDrawer()">Отмена</button>
+      <div class="flex items-center gap-3">
+        <button x-show="editingPost" class="btn btn-secondary" @click="saveEdit()">Сохранить</button>
+        <button x-show="!editingPost" class="btn btn-primary min-w-[140px]" @click="launch()" :disabled="remaining < 0">
+          Запустить
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADD CHANNEL ═══ -->
+<div x-show="addChannelOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div x-show="addChannelOpen" x-transition.opacity.duration.150ms class="absolute inset-0 bg-ink/30 backdrop-blur-sm" @click="addChannelOpen=false"></div>
+  <div x-show="addChannelOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+       class="relative w-full max-w-[440px] rounded-2xl border border-line bg-surface p-6 shadow-pop">
+    <h3 class="font-serif text-[20px] font-medium text-ink">Добавить канал</h3>
+    <p class="mt-1 text-[12px] text-ink-3">Канал попадёт в белый список автоподхвата</p>
+    <div x-show="channelError" x-cloak class="mt-3 rounded-xl border border-err/30 bg-err-bg px-3 py-2">
+      <p class="text-[12px] text-err" x-text="channelError"></p>
+    </div>
+    <form class="mt-5 space-y-4" @submit.prevent="addChannel()" autocomplete="off">
+      <div>
+        <label class="label">Ссылка на канал</label>
+        <input type="text" class="field field-mono text-[13px]" x-model="channelForm.link" placeholder="max.ru/mychannel" spellcheck="false"/>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-secondary" @click="addChannelOpen=false">Отмена</button>
+        <button type="submit" class="btn btn-primary">Добавить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- ═══ TEMPLATE DRAWER ═══ -->
+<div x-show="templateDrawerOpen" x-cloak class="fixed inset-0 z-50">
+  <div x-show="templateDrawerOpen" x-transition.opacity.duration.200ms class="absolute inset-0 bg-ink/20 backdrop-blur-sm" @click="templateDrawerOpen=false"></div>
+  <div x-show="templateDrawerOpen"
+       x-transition:enter="transition ease-out duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+       x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
+       class="absolute right-0 top-0 bottom-0 flex w-full max-w-[480px] flex-col border-l border-line bg-surface shadow-2xl rounded-l-2xl overflow-hidden">
+
+    <div class="flex h-16 shrink-0 items-center justify-between border-b border-line px-6">
+      <h2 class="font-serif text-[20px] font-medium text-ink" x-text="editingTemplate ? 'Редактировать шаблон' : 'Новый шаблон'"></h2>
+      <button class="icon-btn" @click="templateDrawerOpen=false">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+      <div x-show="templateError" x-cloak class="mx-6 mt-5 rounded-xl border border-err/30 bg-err-bg px-4 py-3">
+        <p class="text-[12px] font-medium text-err" x-text="templateError"></p>
+      </div>
+
+      <section class="drawer-section">
+        <label class="label">Название шаблона</label>
+        <input type="text" x-model="tplForm.name" class="field text-[13px]" placeholder="Например: Плавный старт" maxlength="60"/>
+      </section>
+
+      <section class="drawer-section">
+        <label class="label">Описание</label>
+        <textarea x-model="tplForm.description" rows="2" class="field text-[13px] h-auto py-2" placeholder="Краткое описание сценария" maxlength="200"></textarea>
+      </section>
+
+      <section class="drawer-section">
+        <label class="label">Длительность</label>
+        <div class="grid grid-cols-3 gap-2.5">
+          <template x-for="d in [7, 14, 30]" :key="d">
+            <button type="button" @click="tplForm.duration=d" class="h-10 rounded-xl border text-[13px] font-medium tabular-nums transition-all"
+                    :class="tplForm.duration===d ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
+                    x-text="d + ' дней'"></button>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <label class="label">Что доставлять</label>
+        <div class="grid grid-cols-3 gap-2.5">
+          <template x-for="m in [{k:'views',n:'Просмотры'},{k:'reactions',n:'Реакции'},{k:'both',n:'Оба'}]" :key="m.k">
+            <button type="button" @click="tplForm.mode=m.k" class="h-10 rounded-xl border text-[13px] font-medium transition-all"
+                    :class="tplForm.mode===m.k ? 'border-accent bg-accent text-white shadow-sm' : 'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-subtle'"
+                    x-text="m.n"></button>
+          </template>
+        </div>
+      </section>
+
+      <section class="drawer-section">
+        <div class="flex items-baseline justify-between">
+          <label class="label mb-0">Этапы распределения</label>
+          <span class="text-[11px] text-ink-4">час · шт/мин</span>
+        </div>
+        <div class="mt-3 space-y-2">
+          <template x-for="(stage, i) in tplForm.stages" :key="i">
+            <div class="flex items-center gap-2">
+              <input type="number" min="0" max="23" class="field field-mono h-9 w-14 text-center" x-model.number="stage.hour"/>
+              <span class="text-[11px] text-ink-4">ч</span>
+              <template x-if="tplForm.mode !== 'reactions'">
+                <input type="number" min="0" max="500" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.views" placeholder="просм/мин"/>
+              </template>
+              <template x-if="tplForm.mode === 'both'">
+                <span class="text-[11px] text-ink-4">+</span>
+              </template>
+              <template x-if="tplForm.mode !== 'views'">
+                <input type="number" min="0" max="100" class="field field-mono h-9 flex-1 text-center" x-model.number="stage.reactions" placeholder="реакц/мин"/>
+              </template>
+              <button type="button" class="icon-btn danger h-9 w-9" :disabled="tplForm.stages.length===1" :class="tplForm.stages.length===1 && 'opacity-30 pointer-events-none'" @click="tplForm.stages.splice(i,1)">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+            </div>
+          </template>
+        </div>
+        <button type="button" @click="tplForm.stages.length < 8 && tplForm.stages.push({hour: Math.min(23, (tplForm.stages[tplForm.stages.length-1].hour||0)+1), views: 15, reactions: 2})"
+                class="mt-2.5 flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-2 text-[12px] font-medium text-ink-3 hover:border-ink-3 hover:bg-subtle">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Добавить этап
+        </button>
+      </section>
+
+      <section class="drawer-section bg-subtle/50">
+        <div class="space-y-2 text-[13px]">
+          <div class="flex items-center justify-between">
+            <span class="text-ink-3">Объём за весь срок</span>
+            <span class="tabular-nums font-medium text-ink">
+              <span class="text-views-fg" x-text="intFmt(tplTotals.views) + ' просм'"></span>
+              <template x-if="tplTotals.reactions > 0"><span> · <span class="text-reactions-fg" x-text="intFmt(tplTotals.reactions) + ' реакц'"></span></span></template>
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-ink-3">Стоимость</span>
+            <span class="tabular-nums font-medium text-ink">₽ <span x-text="fmtMoney(tplTotals.views * 0.05 + tplTotals.reactions * 0.15)"></span></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-line px-6 bg-surface">
+      <button class="btn btn-ghost" @click="templateDrawerOpen=false">Отмена</button>
+      <button class="btn btn-primary min-w-[140px]" @click="saveTemplate()" x-text="editingTemplate ? 'Сохранить' : 'Создать'"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONFIRM ═══ -->
+<div x-show="confirm.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div x-show="confirm.open" x-transition.opacity.duration.150ms class="absolute inset-0 bg-ink/30 backdrop-blur-sm" @click="confirm.open=false"></div>
+  <div x-show="confirm.open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95"
+       class="relative w-full max-w-[400px] rounded-2xl border border-line bg-surface p-6 shadow-pop">
+    <h3 class="font-serif text-[20px] font-medium text-ink" x-text="confirm.title"></h3>
+    <p class="mt-2 text-[13px] leading-relaxed text-ink-3" x-text="confirm.message"></p>
+    <div class="mt-6 flex justify-end gap-2">
+      <button class="btn btn-secondary" @click="confirm.open=false">Отмена</button>
+      <button class="btn btn-danger" x-text="confirm.label" @click="runConfirm()"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOASTS ═══ -->
+<div class="fixed bottom-6 right-6 z-[60] flex w-[min(92vw,340px)] flex-col gap-2" aria-live="polite">
+  <template x-for="t in toasts" :key="t.id">
+    <div x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100"
+         class="flex items-start gap-3 rounded-xl border border-line bg-surface px-4 py-3 shadow-pop">
+      <span class="dot mt-1.5 shrink-0" :class="t.type==='success' ? 'bg-ok' : t.type==='error' ? 'bg-err' : t.type==='warning' ? 'bg-warn' : 'bg-accent'"></span>
+      <div class="min-w-0 flex-1">
+        <p class="text-[13px] font-medium leading-tight text-ink" x-text="t.title"></p>
+        <p x-show="t.desc" class="mt-1 text-[12px] leading-snug text-ink-3" x-text="t.desc"></p>
+      </div>
+    </div>
+  </template>
+</div>
+
+<script>
+function app() {
+  return {
+    tab: 'tasks',
+    balance: 5400,
+    smmBalanceUrl: 'https://smmprime.net/balance',
+    syncedAt: 'только что',
+    lastPickup: '2 мин назад',
+    refreshing: false,
+    showKey: false,
+
+    filter: 'all',
+    query: '',
+    channelFilter: '',
+    sortValue: 'date-desc',
+    channelQuery: '',
+
+    analyticsPeriod: 14,
+
+    drawerOpen: false,
+    editingPost: null,
+    formError: '',
+    postMenuOpen: null,
+    selected: [],
+
+    addChannelOpen: false,
+    channelError: '',
+    channelForm: { link: '' },
+
+    confirm: { open: false, title: '', message: '', label: 'Удалить', action: null },
+
+    reactions: [
+      { key: 'class',   emoji: '👍', name: 'Класс' },
+      { key: 'fire',    emoji: '🔥', name: 'Огонь' },
+      { key: 'heart',   emoji: '❤️', name: 'Сердце' },
+      { key: 'laugh',   emoji: '😂', name: 'Смех' },
+      { key: 'party',   emoji: '🎉', name: 'Праздник' },
+      { key: 'clap',    emoji: '👏', name: 'Хлопки' },
+      { key: 'hundred', emoji: '💯', name: 'Сотка' },
+      { key: 'rocket',  emoji: '🚀', name: 'Ракета' },
+    ],
+
+    posts: [
+      { id: 1700000001, url: 'max.ru/technopulse/p-8412', channel: 'Техно Пульс',
+        status: 'running', currentHour: 3, totalHours: 168,
+        delivered: { views: 130, reactions: 22 }, total: { views: 1000, reactions: 200 },
+        reactionKey: 'fire', duration: 7, mode: 'both', stages: [{hour:0,views:15,reactions:2},{hour:2,views:30,reactions:3}] },
+      { id: 1700000002, url: 'max.ru/cryptowater/p-5531', channel: 'Крипта без воды',
+        status: 'running', currentHour: 8, totalHours: 336,
+        delivered: { views: 220, reactions: 180 }, total: { views: 500, reactions: 500 },
+        reactionKey: 'heart', duration: 14, mode: 'both', stages: [{hour:0,views:10,reactions:8},{hour:4,views:20,reactions:12}] },
+      { id: 1700000003, url: 'max.ru/designcode/p-2290', channel: 'Дизайн и Код',
+        status: 'running', currentHour: 18, totalHours: 168,
+        delivered: { views: 950, reactions: 140 }, total: { views: 1200, reactions: 200 },
+        reactionKey: 'class', duration: 7, mode: 'both', stages: [{hour:0,views:40,reactions:5}] },
+      { id: 1700000004, url: 'max.ru/analyticsmoney/p-1120', channel: 'Аналитика и Деньги',
+        status: 'running', currentHour: 6, totalHours: 336,
+        delivered: { views: 310, reactions: 42 }, total: { views: 2000, reactions: 300 },
+        reactionKey: 'fire', duration: 14, mode: 'both', stages: [{hour:0,views:20,reactions:3}] },
+      { id: 1700000005, url: 'max.ru/technopulse/p-8401', channel: 'Техно Пульс',
+        status: 'paused', currentHour: 12, totalHours: 168,
+        delivered: { views: 280, reactions: 40 }, total: { views: 600, reactions: 120 },
+        reactionKey: 'heart', duration: 7, mode: 'both', stages: [{hour:0,views:20,reactions:2}] },
+      { id: 1700000006, url: 'max.ru/designcode/p-2280', channel: 'Дизайн и Код',
+        status: 'paused', currentHour: 15, totalHours: 168,
+        delivered: { views: 96, reactions: 30 }, total: { views: 800, reactions: 150 },
+        reactionKey: 'class', duration: 7, mode: 'both', stages: [{hour:0,views:15,reactions:2}] },
+      { id: 1700000007, url: 'max.ru/marketing0/p-9801', channel: 'Маркетинг с Нуля',
+        status: 'completed', currentHour: 168, totalHours: 168,
+        delivered: { views: 2000, reactions: 300 }, total: { views: 2000, reactions: 300 },
+        reactionKey: 'rocket', duration: 7, mode: 'both', stages: [{hour:0,views:30,reactions:4}] },
+      { id: 1700000008, url: 'max.ru/cryptowater/p-5402', channel: 'Крипта без воды',
+        status: 'completed', currentHour: 336, totalHours: 336,
+        delivered: { views: 640, reactions: 200 }, total: { views: 640, reactions: 200 },
+        reactionKey: 'party', duration: 14, mode: 'both', stages: [{hour:0,views:15,reactions:5}] }
+    ],
+
+    channels: [
+      { id: 1, handle: 'technopulse', subs: 24300, err: 8.4, delivered: 58200, status: 'active' },
+      { id: 2, handle: 'cryptowater', subs: 18750, err: 7.1, delivered: 44100, status: 'active' },
+      { id: 3, handle: 'designcode', subs: 9840, err: 9.6, delivered: 21300, status: 'active' },
+      { id: 4, handle: 'marketing0', subs: 31200, err: 6.2, delivered: 73400, status: 'active' },
+      { id: 5, handle: 'analyticsmoney', subs: 12400, err: 7.9, delivered: 28900, status: 'paused' }
+    ],
+
+    settings: {
+      apiKey: 'smmk_live_9f2e71ab3d4c8b6e3f9a',
+      endpoint: 'https://api.smmprime.net/v2',
+      autoPickup: true,
+      pickupInterval: 5
+    },
+
+    form: {
+      url: '', duration: 7, mode: 'both', mixMode: false,
+      reactions: ['fire'], granularity: 'hour',
+      stages: [{ hour: 0, minute: 0, views: 15, reactions: 2 }, { hour: 2, minute: 0, views: 30, reactions: 3 }]
+    },
+
+    // ─── Шаблоны ────────────────────────────
+    templates: [
+      { id: 1, name: 'Плавный старт', description: 'Медленный разгон первые 2 часа, затем стабильный темп',
+        duration: 7, mode: 'both',
+        stages: [{hour:0,views:8,reactions:1},{hour:1,views:15,reactions:2},{hour:3,views:25,reactions:3},{hour:6,views:20,reactions:2}] },
+      { id: 2, name: 'Вечерний пик', description: 'Минимум днём, максимум вечером 18–22 ч',
+        duration: 14, mode: 'both',
+        stages: [{hour:0,views:10,reactions:1},{hour:9,views:5,reactions:1},{hour:18,views:35,reactions:5},{hour:22,views:15,reactions:2}] },
+      { id: 3, name: 'Только просмотры · быстрые', description: 'Высокая скорость просмотров без реакций',
+        duration: 7, mode: 'views',
+        stages: [{hour:0,views:40},{hour:4,views:60},{hour:12,views:30}] },
+      { id: 4, name: 'Выходные усиление', description: 'Повышенная активность в сб и вс',
+        duration: 30, mode: 'both',
+        stages: [{hour:0,views:12,reactions:2},{hour:8,views:20,reactions:3},{hour:48,views:35,reactions:5},{hour:120,views:35,reactions:5}] }
+    ],
+    templateDrawerOpen: false,
+    editingTemplate: null,
+    templateError: '',
+    templateQuery: '',
+    tplForm: { name: '', description: '', duration: 7, mode: 'both', stages: [{hour:0,views:15,reactions:2}] },
+
+    toasts: [],
+    toastSeq: 0,
+    charts: { hourly: null, analytics: null },
+
+    // ─── Init & Chart Management ────────────
+    init() {
+      this.$watch('tab', (val) => {
+        if (val === 'tasks') this.waitAndDrawHourly();
+        if (val === 'analytics') this.waitAndDrawAnalytics();
+      });
+
+      this.$watch('analyticsPeriod', () => {
+        if (this.tab === 'analytics') this.waitAndDrawAnalytics();
+      });
+
+      this.initResizeHandler();
+
+      // Первичная отрисовка с retry (ждём загрузку Chart.js)
+      this.tryDrawHourly(0);
+
+      setInterval(() => this.tick(), 3000);
+    },
+
+    chartReady() { return typeof Chart !== 'undefined' && Chart && typeof Chart === 'function' || (window.Chart && window.Chart.defaults); },
+    isFallbackChart() { return window.Chart && window.Chart.__set !== undefined; },
+
+    tryDrawHourly(attempt) {
+      if (this.chartReady()) { this.waitAndDrawHourly(); return; }
+      if (attempt > 30) return; // 15 сек ждём
+      setTimeout(() => this.tryDrawHourly(attempt + 1), 500);
+    },
+    tryDrawAnalytics(attempt) {
+      if (this.chartReady()) { this.waitAndDrawAnalytics(); return; }
+      if (attempt > 30) return;
+      setTimeout(() => this.tryDrawAnalytics(attempt + 1), 500);
+    },
+
+    waitAndDrawHourly() {
+      // Ждем, пока DOM отрисуется и контейнер получит размеры
+      this.$nextTick(() => {
+        setTimeout(() => {
+          if (this.$refs.hourlyCanvas && this.$refs.hourlyCanvas.clientWidth > 0) {
+            this.drawHourlyChart();
+          }
+        }, 50);
+      });
+    },
+
+    waitAndDrawAnalytics() {
+      this.$nextTick(() => {
+        setTimeout(() => {
+          if (this.$refs.analyticsCanvas && this.$refs.analyticsCanvas.clientWidth > 0) {
+            this.drawAnalyticsChart();
+          }
+        }, 50);
+      });
+    },
+
+    get hourlyViews() { return [8, 12, 18, 26, 22, 30, 42, 52, 58, 55, 48, 42, 38, 34, 32, 30, 38, 48, 56, 62, 58, 46, 32, 18]; },
+    get hourlyReactions() { return [2, 3, 4, 6, 5, 7, 9, 12, 14, 13, 11, 10, 9, 8, 7, 7, 9, 11, 14, 16, 14, 11, 7, 4]; },
+    get todayViews() { return this.hourlyViews.reduce((a, b) => a + b, 0) * 6; },
+    get todayReactions() { return this.hourlyReactions.reduce((a, b) => a + b, 0) * 6; },
+    get todayCost() { return Math.round(((this.todayViews * 0.05) + (this.todayReactions * 0.15)) * 100) / 100; },
+    get peakRate() { return Math.max(...this.hourlyViews); },
+    get peakHour() { return this.hourlyViews.indexOf(this.peakRate); },
+
+    drawHourlyChart() {
+      if (this.charts.hourly) {
+        try { this.charts.hourly.destroy(); } catch(e) {}
+      }
+      
+      Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+      Chart.defaults.color = '#A8A29E';
+      Chart.defaults.font.size = 11;
+      
+      const ctx = this.$refs.hourlyCanvas.getContext('2d');
+      
+      this.charts.hourly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: this.hourlyViews.map((_, i) => i),
+          datasets: [
+            { label: 'Просмотры', data: this.hourlyViews, backgroundColor: '#7F9AB3', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.9 },
+            { label: 'Реакции', data: this.hourlyReactions, backgroundColor: '#D9A594', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.9 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 600 },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1A1A1A', titleColor: '#FAF8F5', bodyColor: '#E8E4DB',
+              padding: 12, cornerRadius: 8, boxPadding: 6,
+              titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 },
+              callbacks: {
+                title: (items) => items[0].label + ':00',
+                label: (item) => '  ' + item.dataset.label + '  ' + Math.round(item.parsed.y * 6).toLocaleString('ru-RU')
+              }
+            }
+          },
+          scales: {
+            x: { stacked: false, grid: { display: false }, border: { display: false },
+                 ticks: { maxTicksLimit: 7, font: { size: 10 }, color: '#A8A29E', padding: 6,
+                          callback: (v, i) => [0, 4, 8, 12, 16, 20].includes(i) ? i + ':00' : '' } },
+            y: { stacked: false, display: false, beginAtZero: true }
+          }
+        }
+      });
+    },
+
+    get analyticsData() {
+      const arr = [];
+      for (let i = this.analyticsPeriod - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const seed = d.getDate() * 7 + d.getMonth() * 31;
+        const views = 400 + ((seed * 9301 + 49297) % 233280) / 233280 * 700;
+        const reactions = 80 + ((seed * 9302 + 49298) % 233280) / 233280 * 200;
+        arr.push({
+          label: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
+          views: Math.round(views * 6),
+          reactions: Math.round(reactions * 2)
+        });
+      }
+      return arr;
+    },
+
+    get analyticsTotals() {
+      const data = this.analyticsData;
+      const views = data.reduce((a, d) => a + d.views, 0);
+      const reactions = data.reduce((a, d) => a + d.reactions, 0);
+      const spent = Math.round((views * 0.05 + reactions * 0.15) * 100) / 100;
+      const avgER = views > 0 ? Math.round((reactions / views) * 1000) / 10 : 0;
+      return { views, reactions, spent, avgER };
+    },
+
+    drawAnalyticsChart() {
+      if (this.charts.analytics) {
+        try { this.charts.analytics.destroy(); } catch(e) {}
+      }
+      
+      const data = this.analyticsData;
+      Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+      Chart.defaults.color = '#A8A29E';
+      Chart.defaults.font.size = 11;
+      
+      const ctx = this.$refs.analyticsCanvas.getContext('2d');
+      
+      this.charts.analytics = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.label),
+          datasets: [
+            { 
+              label: 'Просмотры', 
+              data: data.map(d => d.views), 
+              borderColor: '#7F9AB3', 
+              backgroundColor: 'rgba(127, 154, 179, 0.08)', 
+              fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: '#FFFFFF', pointHoverBorderColor: '#7F9AB3', pointHoverBorderWidth: 2 
+            },
+            { 
+              label: 'Реакции', 
+              data: data.map(d => d.reactions), 
+              borderColor: '#D9A594', 
+              backgroundColor: 'rgba(217, 165, 148, 0.08)', 
+              fill: true, tension: 0.4, borderWidth: 2, borderDash: [5,4], pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: '#FFFFFF', pointHoverBorderColor: '#D9A594', pointHoverBorderWidth: 2 
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 600 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#1A1A1A', titleColor: '#FAF8F5', bodyColor: '#E8E4DB',
+              padding: 12, cornerRadius: 8, boxPadding: 6, usePointStyle: true, pointStyle: 'circle',
+              titleFont: { size: 11, weight: '600' }, bodyFont: { size: 12 },
+              callbacks: { label: (item) => '  ' + item.dataset.label + '  ' + Math.round(item.parsed.y).toLocaleString('ru-RU') }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, border: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#A8A29E', padding: 6 } },
+            y: { beginAtZero: true, grid: { color: '#F3F0EB', drawTicks: false }, border: { display: false }, ticks: { maxTicksLimit: 4, padding: 8, font: { size: 10 }, color: '#A8A29E', callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v } }
+          }
+        }
+      });
+    },
+
+
+    // Перерисовка графиков при resize
+    initResizeHandler() {
+      let rt;
+      window.addEventListener('resize', () => {
+        clearTimeout(rt);
+        rt = setTimeout(() => {
+          if (this.tab === 'tasks' && this.charts.hourly) this.drawHourlyChart();
+          if (this.tab === 'analytics' && this.charts.analytics) this.drawAnalyticsChart();
+        }, 200);
+      });
+    },
+    // ─── Шаблоны: методы ────────────────────
+    get templatesFiltered() {
+      let arr = [...this.templates];
+      if (this.templateQuery) {
+        const q = this.templateQuery.toLowerCase();
+        arr = arr.filter(t => t.name.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q));
+      }
+      return arr;
+    },
+
+    tplPreview(tpl) { return this.expandStages(tpl.stages); },
+    tplMax(tpl) {
+      const h = this.expandStages(tpl.stages);
+      return Math.max(...h.map(x => Math.max(x.views, x.reactions * 3)), 1);
+    },
+    tplDayViews(tpl) {
+      const plan = this.expandStages(tpl.stages);
+      return Math.round(plan.reduce((a, h) => a + (tpl.mode === 'reactions' ? 0 : h.views * 60), 0));
+    },
+    get tplTotals() {
+      const plan = this.expandStages(this.tplForm.stages);
+      const dayViews = plan.reduce((a, h) => a + (this.tplForm.mode === 'reactions' ? 0 : h.views * 60), 0);
+      const dayReactions = plan.reduce((a, h) => a + (this.tplForm.mode === 'views' ? 0 : h.reactions * 60), 0);
+      return { views: dayViews * this.tplForm.duration, reactions: dayReactions * this.tplForm.duration };
+    },
+
+    openTemplateDrawer() {
+      this.templateError = '';
+      this.editingTemplate = null;
+      this.tplForm = { name: '', description: '', duration: 7, mode: 'both', stages: [{hour:0,views:15,reactions:2}] };
+      this.templateDrawerOpen = true;
+    },
+    editTemplate(tpl) {
+      this.templateError = '';
+      this.editingTemplate = tpl;
+      this.tplForm = {
+        name: tpl.name, description: tpl.description || '',
+        duration: tpl.duration, mode: tpl.mode,
+        stages: tpl.stages.map(s => ({ hour: s.hour, views: s.views || 0, reactions: s.reactions || 0 }))
+      };
+      this.templateDrawerOpen = true;
+    },
+    saveTemplate() {
+      this.templateError = '';
+      if (!this.tplForm.name.trim()) { this.templateError = 'Укажите название шаблона'; return; }
+      if (this.tplForm.stages.length === 0) { this.templateError = 'Добавьте хотя бы один этап'; return; }
+      const data = {
+        name: this.tplForm.name.trim(),
+        description: this.tplForm.description.trim(),
+        duration: this.tplForm.duration,
+        mode: this.tplForm.mode,
+        stages: this.tplForm.stages.map(s => ({ hour: +s.hour || 0, views: +s.views || 0, reactions: +s.reactions || 0 }))
+      };
+      if (this.editingTemplate) {
+        Object.assign(this.editingTemplate, data);
+        this.toast('success', 'Шаблон обновлён', data.name);
+      } else {
+        this.templates.push({ id: Date.now(), ...data });
+        this.toast('success', 'Шаблон создан', data.name);
+      }
+      this.templateDrawerOpen = false;
+      this.editingTemplate = null;
+    },
+    applyTemplateToForm(tpl) {
+      this.form.duration = tpl.duration;
+      this.form.mode = tpl.mode;
+      this.form.stages = tpl.stages.map(s => ({ hour: s.hour, minute: 0, views: s.views || 0, reactions: s.reactions || 0 }));
+      this.toast('info', 'Шаблон применён', tpl.name);
+    },
+    applyTemplate(tpl) {
+      this.form.duration = tpl.duration;
+      this.form.mode = tpl.mode;
+      this.form.stages = tpl.stages.map(s => ({ hour: s.hour, minute: 0, views: s.views || 0, reactions: s.reactions || 0 }));
+      if (tpl.mode !== 'views' && !this.form.reactions.length) this.form.reactions = ['fire'];
+      this.tab = 'tasks';
+      this.openDrawer();
+      this.toast('info', 'Шаблон применён', tpl.name + ' — укажите ссылку на пост');
+    },
+    askRemoveTemplate(tpl) {
+      this.openConfirm({
+        title: 'Удалить шаблон?',
+        message: '«' + tpl.name + '» будет удалён без возможности восстановления.',
+        action: () => {
+          this.templates = this.templates.filter(t => t.id !== tpl.id);
+          this.toast('success', 'Шаблон удалён');
+        }
+      });
+    },
+
+    // ─── Утилиты ────────────────────────────
+    intFmt(n) { return Math.round(+n || 0).toLocaleString('ru-RU'); },
+    fmtMoney(n) {
+      n = +n || 0;
+      const abs = Math.abs(n);
+      const s = abs.toLocaleString('ru-RU', { minimumFractionDigits: Number.isInteger(abs) ? 0 : 2, maximumFractionDigits: 2 });
+      return (n < 0 ? '-' : '') + s;
+    },
+    pct(p) {
+      const totalV = p.total.views + p.total.reactions;
+      const doneV = p.delivered.views + p.delivered.reactions;
+      return totalV > 0 ? Math.min(100, Math.round((doneV / totalV) * 100)) : 0;
+    },
+    pctViews(p) { return p.total.views > 0 ? Math.min(100, (p.delivered.views / p.total.views) * 100) : 0; },
+    pctReactions(p) { return p.total.reactions > 0 ? Math.min(100, (p.delivered.reactions / p.total.reactions) * 100) : 0; },
+    statusMeta(s) {
+      return ({
+        running: { dot: 'bg-views', label: 'В работе', cls: 'text-views-fg' },
+        paused: { dot: 'bg-warn', label: 'Пауза', cls: 'text-warn' },
+        completed: { dot: 'bg-ok', label: 'Готово', cls: 'text-ok' }
+      })[s] || { dot: 'bg-ink-4', label: s, cls: 'text-ink-3' };
+    },
+    reactionEmoji(key) {
+      if (!key) return '';
+      if (key === 'mix') return '🎲';
+      const r = this.reactions.find(x => x.key === key);
+      return r ? r.emoji : '';
+    },
+    formatEta(hours) {
+      if (hours < 1) return Math.round(hours * 60) + ' мин';
+      if (hours < 24) return Math.round(hours) + ' ч';
+      const d = Math.floor(hours / 24);
+      const h = Math.round(hours % 24);
+      return d + ' д' + (h > 0 ? ' ' + h + ' ч' : '');
+    },
+    get runningCount() { return this.posts.filter(p => p.status === 'running').length; },
+    get pausedCount() { return this.posts.filter(p => p.status === 'paused').length; },
+
+    get sortedPosts() {
+      let arr = this.posts;
+      if (this.filter !== 'all') arr = arr.filter(p => p.status === this.filter);
+      if (this.channelFilter) arr = arr.filter(p => p.channel === 'max.ru/' + this.channelFilter || p.channel === this.channelFilter);
+      if (this.query) {
+        const q = this.query.toLowerCase();
+        arr = arr.filter(p => p.url.toLowerCase().includes(q) || p.channel.toLowerCase().includes(q));
+      }
+      const [field, dir] = this.sortValue.split('-');
+      arr = [...arr];
+      arr.sort((a, b) => {
+        let cmp = 0;
+        if (field === 'date') cmp = a.id - b.id;
+        else if (field === 'progress') cmp = this.pct(a) - this.pct(b);
+        else if (field === 'channel') cmp = a.channel.localeCompare(b.channel);
+        return dir === 'desc' ? -cmp : cmp;
+      });
+      return arr;
+    },
+
+    get channelsFiltered() {
+      let arr = [...this.channels];
+      if (this.channelQuery) {
+        const q = this.channelQuery.toLowerCase();
+        arr = arr.filter(c => c.handle.toLowerCase().includes(q));
+      }
+      arr.sort((a, b) => b.delivered - a.delivered);
+      return arr;
+    },
+
+    get topPosts() {
+      return [...this.posts]
+        .sort((a, b) => (b.total.views + b.total.reactions * 3) - (a.total.views + a.total.reactions * 3))
+        .slice(0, 5);
+    },
+
+    get reactionStats() {
+      return [
+        { key: 'fire', emoji: '🔥', name: 'Огонь', count: 1420, pct: 34 },
+        { key: 'heart', emoji: '❤️', name: 'Сердце', count: 980, pct: 23 },
+        { key: 'class', emoji: '👍', name: 'Класс', count: 720, pct: 17 },
+        { key: 'laugh', emoji: '😂', name: 'Смех', count: 540, pct: 13 },
+        { key: 'rocket', emoji: '🚀', name: 'Ракета', count: 320, pct: 8 }
+      ];
+    },
+
+    get detectedChannel() {
+      if (!this.form.url) return null;
+      const url = this.form.url.toLowerCase();
+      const ch = this.channels.find(c => url.includes(c.handle));
+      return ch ? ('max.ru/' + ch.handle) : null;
+    },
+
+    // ─── Математика графиков ────────────────
+    expandStages(stages) {
+      const sorted = [...stages].sort((a, b) => (a.hour * 60 + (a.minute || 0)) - (b.hour * 60 + (b.minute || 0)));
+      const hours = [];
+      for (let h = 0; h < 24; h++) {
+        let active = sorted[0];
+        for (const s of sorted) {
+          const stageMin = s.hour * 60 + (s.minute || 0);
+          if (stageMin <= h * 60) active = s;
+        }
+        hours.push({ views: active.views || 0, reactions: active.reactions || 0 });
+      }
+      return hours;
+    },
+    get expandedPlan() { return this.expandStages(this.form.stages); },
+    get maxVolume() {
+      const h = this.expandStages(this.form.stages);
+      return Math.max(...h.map(x => Math.max(x.views, x.reactions * 3)), 1);
+    },
+    barHeightOf(value, max) { return Math.max(2, (value / max) * 100); },
+    get totals() {
+      const plan = this.expandedPlan;
+      const dayViews = plan.reduce((a, h) => a + (this.form.mode === 'reactions' ? 0 : h.views * 60), 0);
+      const dayReactions = plan.reduce((a, h) => a + (this.form.mode === 'views' ? 0 : h.reactions * 60), 0);
+      return { views: dayViews * this.form.duration, reactions: dayReactions * this.form.duration };
+    },
+    get cost() { return Math.round((this.totals.views * 0.05 + this.totals.reactions * 0.15) * 100) / 100; },
+    get remaining() { return Math.round((this.balance - this.cost) * 100) / 100; },
+
+    // ─── Интерфейс ──────────────────────────
+    openDrawer() {
+      this.formError = '';
+      this.editingPost = null;
+      this.form = {
+        url: '', duration: 7, mode: 'both', mixMode: false,
+        reactions: ['fire'], granularity: 'hour',
+        stages: [{ hour: 0, minute: 0, views: 15, reactions: 2 }, { hour: 2, minute: 0, views: 30, reactions: 3 }]
+      };
+      this.drawerOpen = true;
+      this.$nextTick(() => { if (this.$refs.urlInput) this.$refs.urlInput.focus(); });
+    },
+    closeDrawer() { this.drawerOpen = false; this.editingPost = null; },
+
+    toggleMix() {
+      this.form.mixMode = !this.form.mixMode;
+      if (!this.form.mixMode) this.form.reactions = this.form.reactions.slice(0, 1);
+    },
+    selectReaction(key) {
+      if (this.form.mixMode) {
+        if (this.form.reactions.includes(key)) {
+          if (this.form.reactions.length > 1) this.form.reactions = this.form.reactions.filter(k => k !== key);
+        } else this.form.reactions.push(key);
+      } else this.form.reactions = [key];
+    },
+    isReactionSelected(key) { return this.form.reactions.includes(key); },
+
+    launch() {
+      this.formError = '';
+      const url = this.form.url.trim().replace(/^https?:\/\//, '');
+      const path = url.split('max.ru/')[1] || '';
+      if (!url.includes('max.ru/') || path.trim().length < 3) {
+        this.formError = 'Укажите корректную ссылку: max.ru/channel/p-1234';
+        return;
+      }
+      if (this.cost > this.balance) {
+        this.toast('error', 'Недостаточно средств', 'Пополните баланс на SMMPrime');
+        return;
+      }
+      this.balance = Math.round((this.balance - this.cost) * 100) / 100;
+      const channel = this.channels.find(c => url.includes(c.handle));
+      this.posts.unshift({
+        id: Date.now(),
+        url,
+        channel: channel ? 'max.ru/' + channel.handle : 'Внешний',
+        status: 'running',
+        currentHour: 0,
+        totalHours: 24 * this.form.duration,
+        delivered: { views: 0, reactions: 0 },
+        total: { views: Math.round(this.totals.views), reactions: Math.round(this.totals.reactions) },
+        reactionKey: this.form.mode === 'views' ? null : (this.form.reactions.length > 1 ? 'mix' : this.form.reactions[0]),
+        duration: this.form.duration,
+        mode: this.form.mode,
+        stages: this.form.stages.map(s => ({ ...s }))
+      });
+      this.closeDrawer();
+      this.toast('success', 'Задание запущено', 'Списано ₽ ' + this.fmtMoney(this.cost));
+    },
+
+    togglePostMenu(id) { this.postMenuOpen = this.postMenuOpen === id ? null : id; },
+    togglePause(p) {
+      p.status = p.status === 'running' ? 'paused' : 'running';
+      this.toast('info', p.status === 'running' ? 'Возобновлено' : 'Приостановлено', p.url);
+    },
+    askRemovePost(p) {
+      this.openConfirm({
+        title: 'Удалить задание?',
+        message: '«' + p.url + '» — доставленное сохранится.',
+        action: () => {
+          this.posts = this.posts.filter(x => x.id !== p.id);
+          this.selected = this.selected.filter(id => id !== p.id);
+          this.toast('success', 'Задание удалено');
+        }
+      });
+    },
+    editPost(post) {
+      this.formError = '';
+      this.editingPost = post;
+      const reactionKeys = post.reactionKey && post.reactionKey !== 'mix' ? [post.reactionKey] : (post.reactionKey === 'mix' ? ['fire', 'heart'] : ['fire']);
+      this.form = {
+        url: post.url, duration: post.duration, mode: post.mode,
+        mixMode: post.reactionKey === 'mix' || reactionKeys.length > 1,
+        reactions: reactionKeys, granularity: 'hour',
+        stages: post.stages.map(s => ({ hour: s.hour, minute: s.minute || 0, views: s.views || 0, reactions: s.reactions || 0 }))
+      };
+      this.drawerOpen = true;
+    },
+    saveEdit() {
+      if (!this.editingPost) return;
+      const p = this.editingPost;
+      p.duration = this.form.duration;
+      p.mode = this.form.mode;
+      p.stages = this.form.stages.map(s => ({ ...s }));
+      p.reactionKey = this.form.mode === 'views' ? null : (this.form.reactions.length > 1 ? 'mix' : this.form.reactions[0]);
+      this.closeDrawer();
+      this.toast('success', 'Изменения сохранены');
+    },
+    duplicatePost(post) {
+      const copy = JSON.parse(JSON.stringify(post));
+      copy.id = Date.now();
+      copy.status = 'running';
+      copy.currentHour = 0;
+      copy.delivered = { views: 0, reactions: 0 };
+      this.posts.unshift(copy);
+      this.toast('success', 'Задание дублировано');
+    },
+    copyUrl(url) {
+      const done = () => this.toast('success', 'URL скопирован');
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText('https://' + url).then(done).catch(done);
+      } catch (e) { done(); }
+    },
+
+    addStage() {
+      if (this.form.stages.length >= 8) return this.toast('info', 'Максимум 8 этапов');
+      const last = this.form.stages[this.form.stages.length - 1];
+      this.form.stages.push({ hour: Math.min(23, (+last.hour || 0) + 1), minute: 0, views: +last.views || 15, reactions: +last.reactions || 2 });
+    },
+    removeStage(i) { if (this.form.stages.length === 1) return; this.form.stages.splice(i, 1); },
+
+    toggleChannel(ch) {
+      ch.status = ch.status === 'active' ? 'paused' : 'active';
+      this.toast('info', ch.status === 'active' ? 'Канал активирован' : 'Канал на паузе', 'max.ru/' + ch.handle);
+    },
+    addChannel() {
+      const link = this.channelForm.link.trim().replace(/^https?:\/\//, '');
+      if (!link.includes('max.ru/')) {
+        this.channelError = 'Ссылка вида max.ru/channel'; return;
+      }
+      const handle = (link.split('max.ru/')[1] || '').split('/')[0].split('?')[0];
+      if (this.channels.find(c => c.handle === handle)) { this.channelError = 'Уже есть в списке'; return; }
+      this.channels.push({ id: Date.now(), handle, subs: 0, err: 0, delivered: 0, status: 'active' });
+      this.addChannelOpen = false;
+      this.channelForm = { link: '' };
+      this.channelError = '';
+      this.toast('success', 'Канал добавлен', 'max.ru/' + handle);
+    },
+    removeChannel(ch) {
+      this.openConfirm({
+        title: 'Удалить канал?',
+        message: 'max.ru/' + ch.handle + ' будет исключён из автоподхвата.',
+        action: () => {
+          this.channels = this.channels.filter(c => c.id !== ch.id);
+          this.toast('success', 'Канал удалён');
+        }
+      });
+    },
+
+    toggleSelect(id) {
+      this.selected = this.selected.includes(id) ? this.selected.filter(x => x !== id) : [...this.selected, id];
+    },
+    bulkAction(action) {
+      if (action === 'delete') {
+        this.openConfirm({
+          title: 'Удалить выбранные?',
+          message: 'Будут удалены ' + this.selected.length + ' заданий. Доставленное сохранится.',
+          label: 'Удалить',
+          action: () => {
+            this.posts = this.posts.filter(p => !this.selected.includes(p.id));
+            this.selected = [];
+            this.toast('success', 'Удалено');
+          }
+        });
+        return;
+      }
+      this.posts.forEach(p => {
+        if (!this.selected.includes(p.id)) return;
+        if (action === 'pause' && p.status === 'running') p.status = 'paused';
+        if (action === 'resume' && p.status === 'paused') p.status = 'running';
+      });
+      this.toast('success', action === 'pause' ? 'Приостановлено' : 'Возобновлено', 'Выбрано: ' + this.selected.length);
+      this.selected = [];
+    },
+
+    toggleSetting(k) {
+      this.settings[k] = !this.settings[k];
+      this.toast('info', this.settings[k] ? 'Включено' : 'Выключено');
+    },
+
+    refresh() {
+      if (this.refreshing) return;
+      this.refreshing = true;
+      setTimeout(() => {
+        this.refreshing = false;
+        this.syncedAt = 'только что';
+        this.toast('success', 'Синхронизировано', 'Данные обновлены');
+      }, 800);
+    },
+
+    tick() {
+      this.posts.forEach(p => {
+        if (p.status !== 'running') return;
+        const step = 3 + Math.floor(Math.random() * 5);
+        if (p.total.views > 0) p.delivered.views = Math.min(p.total.views, p.delivered.views + Math.ceil(step * 3));
+        if (p.total.reactions > 0) p.delivered.reactions = Math.min(p.total.reactions, p.delivered.reactions + Math.ceil(step * 0.5));
+        p.currentHour = Math.min(p.totalHours, p.currentHour + 0.05);
+        if (p.delivered.views >= p.total.views && p.delivered.reactions >= p.total.reactions) {
+          p.status = 'completed';
+          p.currentHour = p.totalHours;
+        }
+      });
+    },
+
+    downloadCSV(filename, rows) {
+      const csv = '\uFEFF' + rows.map(r => r.map(v => String(v).replace(/;/g, ',')).join(';')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    },
+    exportTasksCSV() {
+      const rows = [['URL', 'Канал', 'Статус', 'Просмотры', 'Всего просм', 'Реакции', 'Всего реакц', 'Прогресс %']];
+      this.sortedPosts.forEach(p => {
+        rows.push([p.url, p.channel, this.statusMeta(p.status).label, p.delivered.views, p.total.views, p.delivered.reactions, p.total.reactions, this.pct(p)]);
+      });
+      this.downloadCSV('max-tasks.csv', rows);
+      this.toast('success', 'CSV выгружен');
+    },
+    exportAnalyticsCSV() {
+      const rows = [['Дата', 'Просмотры', 'Реакции']];
+      this.analyticsData.forEach(d => rows.push([d.label, d.views, d.reactions]));
+      this.downloadCSV('max-analytics.csv', rows);
+      this.toast('success', 'Аналитика выгружена');
+    },
+
+    toast(type, title, desc = '') {
+      const id = ++this.toastSeq;
+      this.toasts.push({ id, type, title, desc });
+      setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 4000);
+    },
+    openConfirm(cfg) {
+      this.confirm = { open: true, title: cfg.title || '', message: cfg.message || '', label: cfg.label || 'Удалить', action: cfg.action || null };
+    },
+    runConfirm() {
+      const fn = this.confirm.action;
+      this.confirm.open = false;
+      if (typeof fn === 'function') fn();
+    }
+  };
+}
+</script>
+</body>
+</html>
